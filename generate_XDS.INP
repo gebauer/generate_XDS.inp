@@ -1,7 +1,7 @@
 #!/bin/bash
 # purpose: generate XDS.INP
 #
-# tested with some datasets from ALS, SSRL, SLS, ESRF and BESSY; only MARCCD, ADSC/SMV, PILATUS 6M detectors; 
+# tested with some datasets from ALS, SSRL, SLS, ESRF and BESSY; only MARCCD, ADSC/SMV, PILATUS detectors; 
 # for other detectors, values marked with XXX must be manually filled in.
 #
 # revision 0.03 . Kay Diederichs 2/2010 
@@ -22,7 +22,8 @@
 # revision 0.18 . KD 4/2011 - faster by doing "strings" only once; revert "images/${1##/*/}" "correction"
 # revision 0.19 . KD 6/2011 - bugfix for 0.18
 # revision 0.20 . KD 7/2011 - redirect stderr of /bin/ls to /dev/null
-REVISION="0.20 (15-Jul-2011)"
+# revision 0.21 . KD 11/2011 - SEPMIN, CLUSTER_RADIUS hints; read NX NY from header (for Pilatus 2M)
+REVISION="0.21 (15-Jul-2011)"
 #
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"
 # make sure to have the two quotation marks !
@@ -216,15 +217,19 @@ elif [ "$DET" == "adsc" ]; then
       OSCILLATION_RANGE=`grep OSC_RANGE tmp2 | sed s/OSC_RANGE=//`
 
 elif [ "$DET" == "pilatus" ]; then
-  DETECTOR="PILATUS MINIMUM_VALID_PIXEL_VALUE=0 OVERLOAD= 1048576  !PILATUS 6M"
+  DETECTOR="PILATUS MINIMUM_VALID_PIXEL_VALUE=0 OVERLOAD= 1048576  !PILATUS"
   SENSOR_THICKNESS=0.32
-  NX=2463 NY=2527 QX=0.172 QY=0.172
+  QX=0.172 QY=0.172
   echo Data from a Pilatus detector
   sed s/#// tmp2 > tmp1
   mv tmp1 tmp2
 
       # find X_RAY_WAVELENGTH:
       X_RAY_WAVELENGTH=`grep Wavelength tmp2 | sed -e s/Wavelength// -e s/A// | awk '{print $1}'`
+
+      # find NX and NY; 2463/2527 is 6M, 1475/1679 is 2M
+      NX=`grep X-Binary-Size-Fastest-Dimension tmp2 | awk '{print $2}'`
+      NY=`grep X-Binary-Size-Second-Dimension tmp2 | awk '{print $2}'`
 
       # find ORGX and ORGY:
       ORGX=`grep Beam_xy tmp2 | sed -e s/\(// -e s/\)// -e s/\,// | awk '{print $2}'`
@@ -283,6 +288,8 @@ VALUE_RANGE_FOR_TRUSTED_DETECTOR_PIXELS=7000. 30000. ! often 8000 is ok
 MINIMUM_ZETA=0.05        ! integrate close to the Lorentz zone; 0.15 is default
 STRONG_PIXEL=6           ! COLSPOT: only use strong reflections (default is 3)
 MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=3 ! default of 6 is sometimes too high
+! close spots: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 6 and 3, e.g. to 4 and 2
+! longest cell axis is DETECTOR_DISTANCE*X-RAY_WAVELENGTH/(SEPMIN*QX) ; CLUSTER_RADIUS=SEPMIN/2
 REFINE(INTEGRATE)=CELL BEAM ORIENTATION ! AXIS DISTANCE 
 
 ! parameters specifically for this detector and beamline:
