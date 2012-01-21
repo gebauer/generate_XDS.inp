@@ -23,8 +23,9 @@
 # revision 0.19 . KD 6/2011 - bugfix for 0.18                                                                
 # revision 0.20 . KD 7/2011 - redirect stderr of /bin/ls to /dev/null                                        
 # revision 0.21 . KD 11/2011 - SEPMIN, CLUSTER_RADIUS hints; read NX NY from header (for Pilatus 2M)
-# revision 0.22 . KD 12/2011 - Pilatus 2M UNTRUSTED_RECTANGLE lines, SENSOR_THICKNESS from header     
-REVISION="0.22 (02-Dec-2011)"                                                                                
+# revision 0.22 . KD 12/2011 - Pilatus 2M UNTRUSTED_RECTANGLE lines, SENSOR_THICKNESS from header
+# revision 0.23 . KD 1/2012 - add UNTRUSTED_QUADRILATERAL, remove MINIMUM_ZETA (0.05 is default now)
+REVISION="0.23 (22-Jan-2012)"                                                                                
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -283,12 +284,12 @@ FRIEDEL'S_LAW=FALSE     ! This acts only on the CORRECT step
 ! exclude (mask) untrusted areas of detector, e.g. beamstop shadow :
 ! UNTRUSTED_RECTANGLE= 1800 1950 2100 2150 ! x-min x-max y-min y-max ! repeat
 ! UNTRUSTED_ELLIPSE= 2034 2070 1850 2240 ! x-min x-max y-min y-max ! if needed
+! UNTRUSTED_QUADRILATERAL= x1 y1 x2 y2 x3 y3 x4 y4 ! see documentation
 !
 ! parameters with changes wrt default values:
 TRUSTED_REGION=0.00 1.2  ! partially use corners of detectors; 1.41421=full use
 VALUE_RANGE_FOR_TRUSTED_DETECTOR_PIXELS=7000. 30000. ! often 8000 is ok
-MINIMUM_ZETA=0.05        ! integrate close to the Lorentz zone; 0.15 is default
-STRONG_PIXEL=6           ! COLSPOT: only use strong reflections (default is 3)
+STRONG_PIXEL=4           ! COLSPOT: only use strong reflections (default is 3)
 MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=3 ! default of 6 is sometimes too high
 ! close spots: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 6 and 3, e.g. to 4 and 2
 REFINE(INTEGRATE)=CELL BEAM ORIENTATION ! AXIS DISTANCE
