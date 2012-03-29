@@ -25,7 +25,8 @@
 # revision 0.21 . KD 11/2011 - SEPMIN, CLUSTER_RADIUS hints; read NX NY from header (for Pilatus 2M)
 # revision 0.22 . KD 12/2011 - Pilatus 2M UNTRUSTED_RECTANGLE lines, SENSOR_THICKNESS from header
 # revision 0.23 . KD 1/2012 - add UNTRUSTED_QUADRILATERAL, remove MINIMUM_ZETA (0.05 is default now)
-REVISION="0.23 (22-Jan-2012)"                                                                                
+# revision 0.24 . KD 3/2012 - remove revision 0.10 since XDS now takes much longer paths
+REVISION="0.24 (28-Mar-2012)"                                                                                
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -65,38 +66,7 @@ NX=XXX
 NY=XXX                                                                                                           
 SENSOR_THICKNESS=0                                                                                               
 # see how we are called:                                                                                         
-NAME_TEMPLATE_OF_DATA_FRAMES="$1"                                                                                
-
-# check that the image template name does not exceed 72 characters
-# and set a link if necessary                                     
-if [ ${#1} -gt 72 ]; then                                         
-    TMP_PATH=$(/bin/ls -C1 $1 $1.bz2 2>/dev/null | head -1)       
-    TMP_FILENAME=$(basename ${TMP_PATH})                          
-    if [ ${#TMP_FILENAME} -gt 65 ]; then                          
-        echo "---> Unable to proceed: image filename "            
-        echo "--->  \"${TMP_FILENAME}\""                          
-        echo "---> exceeds 72 characters."                        
-        echo "---> Please rename files or set links."             
-        exit                                                      
-    else                                                          
-        echo "---> Warning: Template name exceeds 72 characters. Setting link \"images\""
-        echo "              to image directory"                                          
-        TMP_DIRNAME=$(dirname ${TMP_PATH})                                               
-        if [ -e "images" ]; then                                                         
-            echo "***  Error:   The file or directory \"images\" already exists. Please remove"
-            echo "              and re-run."                                                   
-            exit                                                                               
-        else                                                                                   
-            ln -s ${TMP_DIRNAME} images                                                        
-        fi                                                                                     
-        NAME_TEMPLATE_OF_DATA_FRAMES="images/${1##/*/}"                                        
-# KD 30.3.11 I believe the previous line should be changed to:                                 
-#      NAME_TEMPLATE_OF_DATA_FRAMES="images/${TMP_FILENAME}"                                   
-# but I have not had the time to properly test this                                            
-        echo "              Using template filename \"${NAME_TEMPLATE_OF_DATA_FRAMES}\""       
-    fi                                                                                         
-fi                                                                                             
-
+NAME_TEMPLATE_OF_DATA_FRAMES="$1"
 # list frames matching the wildcards in NAME_TEMPLATE_OF_DATA_FRAMES
 # don't accept the "direct beam" shot at SLS/Pilatus PX-I and PX-II 
 /bin/ls -C1 $1 $1.bz2 2>/dev/null | egrep -v "_00000.cbf|_000.img" > tmp1 || exit 1
@@ -202,8 +172,8 @@ elif [ "$DET" == "adsc" ]; then
       BEAM_CENTER_Y=`grep BEAM_CENTER_Y tmp2 | sed s/BEAM_CENTER_Y=//`
 # fix 2010-04-26 - tell user about possible ORGX, ORGY alternatives -  
 # at ESRF and ... (pls fill in!) the following should be used:         
-      ORGX=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l `               
-      ORGY=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l `               
+      ORGX=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l`               
+      ORGY=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l`               
       echo - at ESRF BLs use: ORGX=$ORGX ORGY=$ORGY                    
 # this 2nd alternative convention should be used at the following beamlines (pls complete the list): ALS 5.0.3, ...
       ORGX=`echo "scale=1; $NX-$BEAM_CENTER_X/$QX" | bc -l `                                                       
@@ -257,6 +227,7 @@ echo X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH
 # now we know everything that is required to generate XDS.INP
 
 cat > XDS.INP << eof
+! written by generate_XDS.INP version $REVISION
 JOB= XYCORR INIT COLSPOT IDXREF DEFPIX INTEGRATE CORRECT
 ORGX= $ORGX ORGY= $ORGY  ! check these values with adxv !
 DETECTOR_DISTANCE= $DETECTOR_DISTANCE                    
@@ -292,6 +263,8 @@ VALUE_RANGE_FOR_TRUSTED_DETECTOR_PIXELS=7000. 30000. ! often 8000 is ok
 STRONG_PIXEL=4           ! COLSPOT: only use strong reflections (default is 3)
 MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=3 ! default of 6 is sometimes too high
 ! close spots: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 6 and 3, e.g. to 4 and 2
+! for bad or low resolution data remove the "!" in the following line: 
+! REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS ! DISTANCE
 REFINE(INTEGRATE)=CELL BEAM ORIENTATION ! AXIS DISTANCE
 
 ! parameters specifically for this detector and beamline:
