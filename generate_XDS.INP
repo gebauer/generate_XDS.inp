@@ -26,7 +26,8 @@
 # revision 0.22 . KD 12/2011 - Pilatus 2M UNTRUSTED_RECTANGLE lines, SENSOR_THICKNESS from header
 # revision 0.23 . KD 1/2012 - add UNTRUSTED_QUADRILATERAL, remove MINIMUM_ZETA (0.05 is default now)
 # revision 0.24 . KD 3/2012 - remove revision 0.10 since XDS now takes much longer paths
-REVISION="0.24 (28-Mar-2012)"                                                                                
+# revision 0.25 . KD 3/2012 - remove revision 0.22 for PSI Pilatus 2M; see http://www.globalphasing.com/autoproc/wiki/index.cgi?TroubleShootingKnownIssues
+REVISION="0.25 (30-Mar-2012)"                                                                                
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -266,6 +267,7 @@ MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=3 ! default of 6 is sometimes too high
 ! for bad or low resolution data remove the "!" in the following line: 
 ! REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS ! DISTANCE
 REFINE(INTEGRATE)=CELL BEAM ORIENTATION ! AXIS DISTANCE
+! REFINE(CORRECT)=CELL BEAM ORIENTATION AXIS DISTANCE ! Default is: refine everything
 
 ! parameters specifically for this detector and beamline:
 DETECTOR= $DETECTOR
@@ -276,12 +278,13 @@ NX= $NX NY= $NY  QX= $QX  QY= $QY ! to make CORRECT happy if frames are unavaila
 DIRECTION_OF_DETECTOR_X-AXIS=1 0 0
 DIRECTION_OF_DETECTOR_Y-AXIS=0 1 0
 INCIDENT_BEAM_DIRECTION=0 0 1
-ROTATION_AXIS=1 0 0    ! at e.g. SERCAT ID-22, APS 19-ID, Australian Synchrotron this needs to be -1 0 0
+ROTATION_AXIS=1 0 0  ! at e.g. Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?) this needs to be -1 0 0
 FRACTION_OF_POLARIZATION=0.98   ! better value is provided by beamline staff!
 POLARIZATION_PLANE_NORMAL=0 1 0
 eof
 if [ "$DET" == "pilatus" ]; then
   if [ $NX == "1475" ]; then
+    if ! grep -q FF_p2m0109_E12398_T6199_vrf_m0p20.tif tmp2 ; then
     cat >> XDS.INP << eof
 !EXCLUSION OF VERTICAL DEAD AREAS OF THE PILATUS 2M DETECTOR
 UNTRUSTED_RECTANGLE= 486  496     0 1680
@@ -295,6 +298,7 @@ UNTRUSTED_RECTANGLE=   0 1476  1042 1062
 UNTRUSTED_RECTANGLE=   0 1476  1254 1274
 UNTRUSTED_RECTANGLE=   0 1476  1466 1486
 eof
+    fi
 #  elif [ $NX == "2463" ]; then
 #    cat >> XDS.INP << eof
 #eof
