@@ -28,7 +28,8 @@
 # revision 0.24 . KD 3/2012 - remove revision 0.10 since XDS now takes much longer paths
 # revision 0.25 . KD 3/2012 - remove revision 0.22 for PSI Pilatus 2M; see http://www.globalphasing.com/autoproc/wiki/index.cgi?TroubleShootingKnownIssues
 # revision 0.26 . KD 7/2012 - Mac-compatibility: replace od flags --skip-bytes= and --read-bytes= with -j and -N (thanks to Oliver Clarke for working this out!)
-REVISION="0.26 (02-Jul-2012)"                                                                                
+# revision 0.27 . KD 11/2012 - EXCLUDE_RESOLUTION_RANGE lines and generic Pilatus Flat_field test
+REVISION="0.27 (23-Nov-2012)"                                                                                
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
