@@ -29,7 +29,8 @@
 # revision 0.25 . KD 3/2012 - remove revision 0.22 for PSI Pilatus 2M; see http://www.globalphasing.com/autoproc/wiki/index.cgi?TroubleShootingKnownIssues
 # revision 0.26 . KD 7/2012 - Mac-compatibility: replace od flags --skip-bytes= and --read-bytes= with -j and -N (thanks to Oliver Clarke for working this out!)
 # revision 0.27 . KD 11/2012 - EXCLUDE_RESOLUTION_RANGE lines and generic Pilatus Flat_field test
-REVISION="0.27 (23-Nov-2012)"                                                                                
+# revision 0.28 . Keitaro 11/2012 - for MarCCD: read oscillation range from the position 1024+736 (fix for omega rotation)
+REVISION="0.28 (28-Nov-2012)"                                                                                
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -127,11 +128,9 @@ elif [ "$DET" == "mccd" ]; then
   ORGY=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}')             
   ORGY=`echo "scale=2; $ORGY/1000" | bc -l `                                                              
 
-  let SKIP=1024+256+128+256+44
-  PHISTART=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}')
-  let SKIP=1024+256+128+256+76                                                                   
-  PHIEND=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}')  
-  OSCILLATION_RANGE=`echo "scale=3; ($PHIEND-($PHISTART))/1000" | bc -l`                         
+  let SKIP=1024+736
+  OSCILLATION_RANGE=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}') 
+  OSCILLATION_RANGE=`echo "scale=3; $OSCILLATION_RANGE/1000" | bc -l`   
                                                                                                  
   let SKIP=1024+256+128+256+128+4                                                                
   QX=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}')      
@@ -300,6 +299,9 @@ if [ "$DET" == "pilatus" ]; then
   if [ $NX == "1475" ]; then
     if ! grep -q Flat_field tmp2 ; then
     cat >> XDS.INP << eof
+! the following specifications cut away one additional pixel adjacent 
+! to each UNTRUSTED_RECTANGLE; so for a detector _with_ proper
+! flat_field correction the lines could be like those for the 6M
 !EXCLUSION OF VERTICAL DEAD AREAS OF THE PILATUS 2M DETECTOR
 UNTRUSTED_RECTANGLE= 486  496     0 1680
 UNTRUSTED_RECTANGLE= 980  990     0 1680
@@ -313,9 +315,24 @@ UNTRUSTED_RECTANGLE=   0 1476  1254 1274
 UNTRUSTED_RECTANGLE=   0 1476  1466 1486
 eof
     fi
-#  elif [ $NX == "2463" ]; then
-#    cat >> XDS.INP << eof
-#eof
+  elif [ $NX == "2463" ]; then
+    cat >> XDS.INP << eof
+UNTRUSTED_RECTANGLE= 487  495     0 2528
+UNTRUSTED_RECTANGLE= 981  989     0 2528
+UNTRUSTED_RECTANGLE=1475 1483     0 2528
+UNTRUSTED_RECTANGLE=1969 1977     0 2528
+UNTRUSTED_RECTANGLE=   0 2464   195  213
+UNTRUSTED_RECTANGLE=   0 2464   407  425
+UNTRUSTED_RECTANGLE=   0 2464   619  637
+UNTRUSTED_RECTANGLE=   0 2464   831  849
+UNTRUSTED_RECTANGLE=   0 2464  1043 1061
+UNTRUSTED_RECTANGLE=   0 2464  1255 1273
+UNTRUSTED_RECTANGLE=   0 2464  1467 1485
+UNTRUSTED_RECTANGLE=   0 2464  1679 1697
+UNTRUSTED_RECTANGLE=   0 2464  1891 1909
+UNTRUSTED_RECTANGLE=   0 2464  2103 2121
+UNTRUSTED_RECTANGLE=   0 2464  2315 2333
+eof
   fi
 fi
 echo XDS.INP is ready for use. The file has only the most important keywords.
