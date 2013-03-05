@@ -31,7 +31,8 @@
 # revision 0.27 . KD 11/2012 - EXCLUDE_RESOLUTION_RANGE lines and generic Pilatus Flat_field test
 # revision 0.28 . Keitaro 11/2012 - for MarCCD: read oscillation range from the position 1024+736 (fix for omega rotation)
 # revision 0.29 . KD 1/2013 - include UNTRUSTED_RECTANGLEs for Pilatus 6M; never hurts but needed if the beamline software does not mark them with -2 or such
-REVISION="0.29 (15-Jan-2013)"                                                                                
+# revision 0.30 . Keitaro 3/2013 - for ADSC: write all possible beam center conventions in XDS.INP as comments
+REVISION="0.30 (05-Mar-2013)"                                                                                
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -175,18 +176,26 @@ elif [ "$DET" == "adsc" ]; then
       BEAM_CENTER_X=`grep BEAM_CENTER_X tmp2 | sed s/BEAM_CENTER_X=//`
       BEAM_CENTER_Y=`grep BEAM_CENTER_Y tmp2 | sed s/BEAM_CENTER_Y=//`
 # fix 2010-04-26 - tell user about possible ORGX, ORGY alternatives -  
-# at ESRF and ... (pls fill in!) the following should be used:         
+      COMMENT_ORGXY="
+! Following are possible beam center interpretations for ADSC detectors"
+# at ESRF, PF, and ... (pls fill in!) the following should be used:         
       ORGX=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l`               
       ORGY=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l`               
-      echo - at ESRF BLs use: ORGX=$ORGX ORGY=$ORGY                    
+      echo - at ESRF,PF BLs use: ORGX=$ORGX ORGY=$ORGY                    
+      COMMENT_ORGXY="${COMMENT_ORGXY}
+! ORGX= $ORGX ORGY= $ORGY ! For ESRF,PF,..."
 # this 2nd alternative convention should be used at the following beamlines (pls complete the list): ALS 5.0.3, ...
       ORGX=`echo "scale=1; $NX-$BEAM_CENTER_X/$QX" | bc -l `                                                       
       ORGY=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l `                                                           
       echo - at e.g. ALS 5.0.3 use: ORGX=$ORGX ORGY=$ORGY                                                          
+      COMMENT_ORGXY="${COMMENT_ORGXY}
+! ORGX= $ORGX ORGY= $ORGY ! For ALS 5.0.3,.."
 # this 3rd alternative convention should be used at the following beamlines (pls complete the list): ALS 8.2.2, ... 
       ORGX=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l `                                                            
       ORGY=`echo "scale=1; $NX-$BEAM_CENTER_Y/$QX" | bc -l `                                                        
       echo - at e.g. ALS 8.2.2 use: ORGX=$ORGX ORGY=$ORGY - this is written to XDS.INP                              
+      COMMENT_ORGXY="${COMMENT_ORGXY}
+! ORGX= $ORGX ORGY= $ORGY ! For ALS 8.2.2,.."
 # the latter alternative is written into the generated XDS.INP ! You have to correct this manually in XDS.INP, or adjust this script.
       # find DETECTOR_DISTANCE and OSCILLATION_RANGE:                                                                                
       DETECTOR_DISTANCE=`grep DISTANCE tmp2 | sed s/DISTANCE=//`                                                                     
@@ -233,7 +242,8 @@ echo X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH
 cat > XDS.INP << eof
 ! written by generate_XDS.INP version $REVISION
 JOB= XYCORR INIT COLSPOT IDXREF DEFPIX INTEGRATE CORRECT
-ORGX= $ORGX ORGY= $ORGY  ! check these values with adxv !
+ORGX= $ORGX ORGY= $ORGY  ! check these values with adxv !\
+$COMMENT_ORGXY
 DETECTOR_DISTANCE= $DETECTOR_DISTANCE                    
 OSCILLATION_RANGE= $OSCILLATION_RANGE                    
 X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH                      
