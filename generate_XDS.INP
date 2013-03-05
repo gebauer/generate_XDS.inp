@@ -32,7 +32,8 @@
 # revision 0.28 . Keitaro 11/2012 - for MarCCD: read oscillation range from the position 1024+736 (fix for omega rotation)
 # revision 0.29 . KD 1/2013 - include UNTRUSTED_RECTANGLEs for Pilatus 6M; never hurts but needed if the beamline software does not mark them with -2 or such
 # revision 0.30 . Keitaro 3/2013 - for ADSC: write all possible beam center conventions in XDS.INP as comments
-REVISION="0.30 (05-Mar-2013)"                                                                                
+# revision 0.31 . Keitaro 3/2013 - add comment for reversed phi for SPring-8
+REVISION="0.31 (06-Mar-2013)"                                                                                
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -291,7 +292,7 @@ NX= $NX NY= $NY  QX= $QX  QY= $QY ! to make CORRECT happy if frames are unavaila
 DIRECTION_OF_DETECTOR_X-AXIS=1 0 0
 DIRECTION_OF_DETECTOR_Y-AXIS=0 1 0
 INCIDENT_BEAM_DIRECTION=0 0 1
-ROTATION_AXIS=1 0 0  ! at e.g. Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A this needs to be -1 0 0
+ROTATION_AXIS=1 0 0  ! at e.g. Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8 this needs to be -1 0 0
 FRACTION_OF_POLARIZATION=0.98   ! better value is provided by beamline staff!
 POLARIZATION_PLANE_NORMAL=0 1 0
 !used by DEFPIX and CORRECT to exclude ice-reflections / ice rings - uncomment if necessary
