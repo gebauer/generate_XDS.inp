@@ -33,7 +33,8 @@
 # revision 0.29 . KD 1/2013 - include UNTRUSTED_RECTANGLEs for Pilatus 6M; never hurts but needed if the beamline software does not mark them with -2 or such
 # revision 0.30 . Keitaro 3/2013 - for ADSC: write all possible beam center conventions in XDS.INP as comments
 # revision 0.31 . Keitaro 3/2013 - add comment for reversed phi for SPring-8
-REVISION="0.31 (06-Mar-2013)"                                                                                
+# revision 0.32 . Keitaro 3/2013 - add RAXIS support. only tested with RAXIS IV++ and VII.
+REVISION="0.32 (15-Mar-2013)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -98,6 +99,7 @@ strings $FIRSTFRAME > tmp2
 egrep -q 'marccd|Corrected' tmp2 && DET=mccd                                 
 grep -q PILATUS tmp2             && DET=pilatus                              
 grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
+head -n1 tmp2 | grep -q "^RAXIS" && DET=raxis
 # identify other detector types in the same way (MAR IP would be straightforward)
 
 # parse ASCII header of first frame
@@ -228,6 +230,26 @@ elif [ "$DET" == "pilatus" ]; then
 
       OSCILLATION_RANGE=`awk '/Angle/{print $2}' tmp2`
 
+elif [ "$DET" == "raxis" ]; then
+  echo Data from a RAXIS detector
+
+  DETECTOR="RAXIS MINIMUM_VALID_PIXEL_VALUE=0  OVERLOAD=2000000"
+  #let SKIP=768
+  #NX=$(od -t x -j $SKIP -N 4 $FIRSTFRAME |awk 'NR==1{print toupper($2)}'|perl -nle '@array= $_ =~/.{2}/g; print "ibase=16;obase=A;".join("",reverse @array)'|bc)
+  NX=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(768);print "%.4d"%struct.unpack(">i",f.read(4))')
+  NY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(772);print "%.4d"%struct.unpack(">i",f.read(4))')
+
+  DETECTOR_DISTANCE=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(344);print "-%.4f"%struct.unpack(">f",f.read(4))')
+
+  ORGX=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(540);print "%.4f"%struct.unpack(">f",f.read(4))')
+  ORGY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(544);print "%.4f"%struct.unpack(">f",f.read(4))')
+
+  OSCILLATION_RANGE=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(524);phis,phie=struct.unpack(">ff",f.read(8));print "%.4f"%(phie-phis)')
+
+  QX=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(776);print "%.6f"%struct.unpack(">f",f.read(4))')
+  QY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(780);print "%.6f"%struct.unpack(">f",f.read(4))')
+
+  X_RAY_WAVELENGTH=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(292);print "%.6f"%struct.unpack(">f",f.read(4))')
 else
   echo should never come here
   exit 1                     
@@ -289,12 +311,27 @@ SENSOR_THICKNESS= $SENSOR_THICKNESS
 ! attention CCD detectors: for very high resolution (better than 1A) make sure to specify SILICON
 ! as about 32* what CORRECT.LP suggests (absorption of phosphor is much higher than that of silicon)
 NX= $NX NY= $NY  QX= $QX  QY= $QY ! to make CORRECT happy if frames are unavailable
+eof
+if [ "$DET" == "raxis" ]; then
+ cat >> XDS.INP << eof
+DIRECTION_OF_DETECTOR_X-AXIS=1 0 0
+DIRECTION_OF_DETECTOR_Y-AXIS=0 -1 0
+INCIDENT_BEAM_DIRECTION=0 0 1
+ROTATION_AXIS=0 1 0
+!FRACTION_OF_POLARIZATION=0.98   ! uncomment if synchrotron
+POLARIZATION_PLANE_NORMAL=1 0 0
+eof
+else
+ cat >> XDS.INP << eof
 DIRECTION_OF_DETECTOR_X-AXIS=1 0 0
 DIRECTION_OF_DETECTOR_Y-AXIS=0 1 0
 INCIDENT_BEAM_DIRECTION=0 0 1
 ROTATION_AXIS=1 0 0  ! at e.g. Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8 this needs to be -1 0 0
 FRACTION_OF_POLARIZATION=0.98   ! better value is provided by beamline staff!
 POLARIZATION_PLANE_NORMAL=0 1 0
+eof
+fi
+cat >> XDS.INP << eof
 !used by DEFPIX and CORRECT to exclude ice-reflections / ice rings - uncomment if necessary
 !EXCLUDE_RESOLUTION_RANGE= 3.93 3.87 !ice-ring at 3.897 Angstrom
 !EXCLUDE_RESOLUTION_RANGE= 3.70 3.64 !ice-ring at 3.669 Angstrom
