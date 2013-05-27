@@ -34,7 +34,8 @@
 # revision 0.30 . Keitaro 3/2013 - for ADSC: write all possible beam center conventions in XDS.INP as comments
 # revision 0.31 . Keitaro 3/2013 - add comment for reversed phi for SPring-8
 # revision 0.32 . Keitaro 3/2013 - add RAXIS support. only tested with RAXIS IV++ and VII.
-REVISION="0.32 (15-Mar-2013)"
+# revision 0.33 . Keitaro 5/2013 - automatically set ROTATION_AXIS=-1 0 0 for SPring-8 BL32XU/41XU/44XU beamlines based on detector serial numbers.
+REVISION="0.33 (27-May-2013)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -64,6 +65,7 @@ fi
 # defaults:                                                                                                      
 #                                                                                                                
 DETECTOR="XXX MINIMUM_VALID_PIXEL_VALUE=XXX OVERLOAD=XXX"                                                        
+REVERSE_PHI="no"
 ORGX=XXX                                                                                                         
 ORGY=XXX                                                                                                         
 DETECTOR_DISTANCE=XXX                                                                                            
@@ -115,6 +117,20 @@ elif [ "$DET" == "mccd" ]; then
   DETECTOR="CCDCHESS MINIMUM_VALID_PIXEL_VALUE= 1 OVERLOAD= 65500"
   SENSOR_THICKNESS=0.01                                           
   # use first frame of dataset to obtain parameters               
+
+  # Check detector serial number and recognize beamline for reversed-phi setting.
+  # Known detectors for reversed-phi in SPring-8: 31: BL32XU MX225HE, 38: BL44XU MX225HE, 42: BL44XU MX300HE, 40: BL41XU MX225HE
+  REVERSEPHI_SNs="
+31
+38
+40
+42
+"
+  # get detector serial number and check if it is included in the list
+  DET_SN=`grep "Detector Serial Number =" tmp2 | sed "s/Detector Serial Number = //"`
+  if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
+    REVERSE_PHI="yes"
+  fi
 
   # offsets are documented; values can be found in mccd_xdsparams.pl script
   let SKIP=1024+80                                                        
@@ -322,11 +338,15 @@ ROTATION_AXIS=0 1 0
 POLARIZATION_PLANE_NORMAL=1 0 0
 eof
 else
+ if [ "$REVERSE_PHI" == "no" ]; then
+  echo 'ROTATION_AXIS=1 0 0  ! at e.g. Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8 this needs to be -1 0 0' >> XDS.INP
+ else
+  echo 'ROTATION_AXIS=-1 0 0  ! if this is wrong, please contact author.' >> XDS.INP
+ fi
  cat >> XDS.INP << eof
 DIRECTION_OF_DETECTOR_X-AXIS=1 0 0
 DIRECTION_OF_DETECTOR_Y-AXIS=0 1 0
 INCIDENT_BEAM_DIRECTION=0 0 1
-ROTATION_AXIS=1 0 0  ! at e.g. Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8 this needs to be -1 0 0
 FRACTION_OF_POLARIZATION=0.98   ! better value is provided by beamline staff!
 POLARIZATION_PLANE_NORMAL=0 1 0
 eof
@@ -406,3 +426,4 @@ echo http://www.mpimf-heidelberg.mpg.de/~kabsch/xds . More documentation in XDSw
 echo After running xds, inspect, using XDS-Viewer, at least the beamstop mask in
 echo BKGPIX.cbf, and the agreement of predicted and observed spots in FRAME.cbf!
 rm -f tmp1 tmp2
+# end of generate_XDS.INP
