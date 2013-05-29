@@ -1,7 +1,7 @@
 #!/bin/bash                                                                   
 # purpose: generate XDS.INP                                                   
 #                                                                             
-# tested with some datasets from ALS, SSRL, SLS, ESRF and BESSY; only MARCCD, ADSC/SMV, PILATUS detectors; 
+# tested with some datasets from ALS, SSRL, SLS, ESRF, BESSY, SPring-8 and PF; only MARCCD, ADSC/SMV, PILATUS, RAXIS (in-house) detectors; 
 # for other detectors, values marked with XXX must be manually filled in.                                  
 #                                                                                                          
 # revision 0.03 . Kay Diederichs 2/2010                                                                    
@@ -35,7 +35,8 @@
 # revision 0.31 . Keitaro 3/2013 - add comment for reversed phi for SPring-8
 # revision 0.32 . Keitaro 3/2013 - add RAXIS support. only tested with RAXIS IV++ and VII.
 # revision 0.33 . Keitaro 5/2013 - automatically set ROTATION_AXIS=-1 0 0 for SPring-8 BL32XU/41XU/44XU beamlines based on detector serial numbers.
-REVISION="0.33 (27-May-2013)"
+# revision 0.34 . Keitaro 5/2013 - recognize ADSC detectors in Photon Factory and choose correct beam center convention based on detector serial numbers.
+REVISION="0.34 (27-May-2013)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -198,24 +199,42 @@ elif [ "$DET" == "adsc" ]; then
       COMMENT_ORGXY="
 ! Following are possible beam center interpretations for ADSC detectors"
 # at ESRF, PF, and ... (pls fill in!) the following should be used:         
-      ORGX=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l`               
-      ORGY=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l`               
-      echo - at ESRF,PF BLs use: ORGX=$ORGX ORGY=$ORGY                    
+      ORGX1=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l`
+      ORGY1=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l`
+      echo - at ESRF,PF BLs use: ORGX=$ORGX1 ORGY=$ORGY1                    
       COMMENT_ORGXY="${COMMENT_ORGXY}
-! ORGX= $ORGX ORGY= $ORGY ! For ESRF,PF,..."
+! ORGX= $ORGX1 ORGY= $ORGY1 ! For ESRF,PF,..."
 # this 2nd alternative convention should be used at the following beamlines (pls complete the list): ALS 5.0.3, ...
-      ORGX=`echo "scale=1; $NX-$BEAM_CENTER_X/$QX" | bc -l `                                                       
-      ORGY=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l `                                                           
-      echo - at e.g. ALS 5.0.3 use: ORGX=$ORGX ORGY=$ORGY                                                          
+      ORGX2=`echo "scale=1; $NX-$BEAM_CENTER_X/$QX" | bc -l `
+      ORGY2=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l `
+      echo - at e.g. ALS 5.0.3 use: ORGX=$ORGX2 ORGY=$ORGY2                                                          
       COMMENT_ORGXY="${COMMENT_ORGXY}
-! ORGX= $ORGX ORGY= $ORGY ! For ALS 5.0.3,.."
+! ORGX= $ORGX2 ORGY= $ORGY2 ! For ALS 5.0.3,.."
 # this 3rd alternative convention should be used at the following beamlines (pls complete the list): ALS 8.2.2, ... 
-      ORGX=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l `                                                            
-      ORGY=`echo "scale=1; $NX-$BEAM_CENTER_Y/$QX" | bc -l `                                                        
-      echo - at e.g. ALS 8.2.2 use: ORGX=$ORGX ORGY=$ORGY - this is written to XDS.INP                              
+      ORGX3=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l `
+      ORGY3=`echo "scale=1; $NX-$BEAM_CENTER_Y/$QX" | bc -l `
+      echo - at e.g. ALS 8.2.2 use: ORGX=$ORGX3 ORGY=$ORGY3 - this is written to XDS.INP                              
       COMMENT_ORGXY="${COMMENT_ORGXY}
-! ORGX= $ORGX ORGY= $ORGY ! For ALS 8.2.2,.."
+! ORGX= $ORGX3 ORGY= $ORGY3 ! For ALS 8.2.2,.."
 # the latter alternative is written into the generated XDS.INP ! You have to correct this manually in XDS.INP, or adjust this script.
+
+      # Decision of beam center convention based on detector serial numbers.
+      DET_SN=`grep DETECTOR_SN tmp2 | sed -e "s/DETECTOR_SN=//"`
+      # For convention 1; Known PF detectors = 449: NW12A Q210, 472: NE3A Q270, 474: BL17A Q270, 912: BL5A Q315
+      ORG1_SNs="
+449
+472
+474
+912
+"
+      if echo "${DET_SN}${ORG1_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
+       ORGX=$ORGX1
+       ORGY=$ORGY1
+      else
+       ORGX=$ORGX3
+       ORGY=$ORGY3
+      fi
+
       # find DETECTOR_DISTANCE and OSCILLATION_RANGE:                                                                                
       DETECTOR_DISTANCE=`grep DISTANCE tmp2 | sed s/DISTANCE=//`                                                                     
       OSCILLATION_RANGE=`grep OSC_RANGE tmp2 | sed s/OSC_RANGE=//`                                                                   
