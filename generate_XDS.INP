@@ -36,7 +36,8 @@
 # revision 0.32 . Keitaro 3/2013 - add RAXIS support. only tested with RAXIS IV++ and VII.
 # revision 0.33 . Keitaro 5/2013 - automatically set ROTATION_AXIS=-1 0 0 for SPring-8 BL32XU/41XU/44XU beamlines based on detector serial numbers.
 # revision 0.34 . Keitaro 5/2013 - recognize ADSC detectors in Photon Factory and choose correct beam center convention based on detector serial numbers.
-REVISION="0.34 (27-May-2013)"
+# revision 0.35 . KD 6/2013 - reduce 7000 to 6000 for shadow detection; insert comment about *_RESOLUTION_RANGE lines
+REVISION="0.35 (11-June-2013)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -314,6 +315,7 @@ SPOT_RANGE=1 $SPOT_RANGE
 SPACE_GROUP_NUMBER=0                   ! 0 if unknown
 UNIT_CELL_CONSTANTS= 70 80 90 90 90 90 ! put correct values if known
 INCLUDE_RESOLUTION_RANGE=50 0  ! after CORRECT, insert high resol limit; re-run CORRECT
+! IDXREF now obeys INCLUDE_RESOLUTION_RANGE and EXCLUDE_RESOLUTION_RANGE to exclude ice-rings
 
 FRIEDEL'S_LAW=FALSE     ! This acts only on the CORRECT step
 ! If the anom signal turns out to be, or is known to be, very low or absent,
@@ -331,7 +333,7 @@ FRIEDEL'S_LAW=FALSE     ! This acts only on the CORRECT step
 !
 ! parameters with changes wrt default values:
 TRUSTED_REGION=0.00 1.2  ! partially use corners of detectors; 1.41421=full use
-VALUE_RANGE_FOR_TRUSTED_DETECTOR_PIXELS=7000. 30000. ! often 8000 is ok
+VALUE_RANGE_FOR_TRUSTED_DETECTOR_PIXELS=6000. 30000. ! often 7000 or 8000 is ok
 STRONG_PIXEL=4           ! COLSPOT: only use strong reflections (default is 3)
 MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=3 ! default of 6 is sometimes too high
 ! close spots: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 6 and 3, e.g. to 4 and 2
