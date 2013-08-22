@@ -37,7 +37,8 @@
 # revision 0.33 . Keitaro 5/2013 - automatically set ROTATION_AXIS=-1 0 0 for SPring-8 BL32XU/41XU/44XU beamlines based on detector serial numbers.
 # revision 0.34 . Keitaro 5/2013 - recognize ADSC detectors in Photon Factory and choose correct beam center convention based on detector serial numbers.
 # revision 0.35 . KD 6/2013 - reduce 7000 to 6000 for shadow detection; insert comment about *_RESOLUTION_RANGE lines
-REVISION="0.35 (11-June-2013)"
+# revision 0.36 . KD 6/2013 - insert NUMBER_OF_PROFILE_GRID* lines for Pilatus (suggested by C.Vonrhein)
+REVISION="0.36 (12-June-2013)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -348,6 +349,7 @@ SENSOR_THICKNESS= $SENSOR_THICKNESS
 ! attention CCD detectors: for very high resolution (better than 1A) make sure to specify SILICON
 ! as about 32* what CORRECT.LP suggests (absorption of phosphor is much higher than that of silicon)
 NX= $NX NY= $NY  QX= $QX  QY= $QY ! to make CORRECT happy if frames are unavailable
+
 eof
 if [ "$DET" == "raxis" ]; then
  cat >> XDS.INP << eof
@@ -386,6 +388,11 @@ cat >> XDS.INP << eof
 !EXCLUDE_RESOLUTION_RANGE= 1.751 1.691 !ice-ring at 1.721 Angstrom - weak
 eof
 if [ "$DET" == "pilatus" ]; then
+cat >> XDS.INP << eof
+NUMBER_OF_PROFILE_GRID_POINTS_ALONG_ALPHA/BETA=13 ! Default is 9 - Increasing may improve data 
+NUMBER_OF_PROFILE_GRID_POINTS_ALONG_GAMMA=13      ! accuracy, particularly if finely-sliced on phi, 
+!                                                   and does not seem to have any downsides. 
+eof
   if [ $NX == "1475" ]; then
     if ! grep -q Flat_field tmp2 ; then
     cat >> XDS.INP << eof
