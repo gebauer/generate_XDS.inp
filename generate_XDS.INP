@@ -38,7 +38,8 @@
 # revision 0.34 . Keitaro 5/2013 - recognize ADSC detectors in Photon Factory and choose correct beam center convention based on detector serial numbers.
 # revision 0.35 . KD 6/2013 - reduce 7000 to 6000 for shadow detection; insert comment about *_RESOLUTION_RANGE lines
 # revision 0.36 . KD 6/2013 - insert NUMBER_OF_PROFILE_GRID* lines for Pilatus (suggested by C.Vonrhein)
-REVISION="0.36 (12-June-2013)"
+# revision 0.37 . Keitaro 10/2013 - fix for MX225HS detector on SPring-8 BL32XU (Ignore case when matching marccd in header); but cannot decide reverse-phi because of missing detector S/N
+REVISION="0.37 (31-October-2013)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -101,7 +102,7 @@ DET=XXX
 FIRSTFRAME=`head -1 tmp1`
 echo $FIRSTFRAME | grep -q bz2 && bzcat $FIRSTFRAME > tmp1 && FIRSTFRAME=tmp1
 strings $FIRSTFRAME > tmp2                                                   
-egrep -q 'marccd|Corrected' tmp2 && DET=mccd                                 
+egrep -qi 'marccd|Corrected' tmp2 && DET=mccd                                 
 grep -q PILATUS tmp2             && DET=pilatus                              
 grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
 head -n1 tmp2 | grep -q "^RAXIS" && DET=raxis
