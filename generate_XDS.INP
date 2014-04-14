@@ -40,7 +40,8 @@
 # revision 0.36 . KD 6/2013 - insert NUMBER_OF_PROFILE_GRID* lines for Pilatus (suggested by C.Vonrhein)
 # revision 0.37 . Keitaro 10/2013 - fix for MX225HS detector on SPring-8 BL32XU (Ignore case when matching marccd in header); but cannot decide reverse-phi because of missing detector S/N
 # revision 0.38 . KD 2/2014 - change defaults for REFINE(IDXREF) and REFINE(INTEGRATE) such that more stable results are obtained for difficult datasets
-REVISION="0.38 (15-February-2014)"
+# revision 0.39 . Keitaro 4/2014 - automatically set ROTATION_AXIS=-1 0 0 for MX225HS at SPring-8 BL32XU.
+REVISION="0.39 (14-April-2014)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -124,12 +125,13 @@ elif [ "$DET" == "mccd" ]; then
   # use first frame of dataset to obtain parameters               
 
   # Check detector serial number and recognize beamline for reversed-phi setting.
-  # Known detectors for reversed-phi in SPring-8: 31: BL32XU MX225HE, 38: BL44XU MX225HE, 42: BL44XU MX300HE, 40: BL41XU MX225HE
+  # Known detectors for reversed-phi in SPring-8: 31: BL32XU MX225HE, 38: BL44XU MX225HE, 42: BL44XU MX300HE, 40: BL41XU MX225HE, 106: BL32XU MX225HS
   REVERSEPHI_SNs="
 31
 38
 40
 42
+106
 "
   # get detector serial number and check if it is included in the list
   DET_SN=`grep "Detector Serial Number =" tmp2 | sed "s/Detector Serial Number = //"`
