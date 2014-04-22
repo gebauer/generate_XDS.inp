@@ -42,7 +42,8 @@
 # revision 0.38 . KD 2/2014 - change defaults for REFINE(IDXREF) and REFINE(INTEGRATE) such that more stable results are obtained for difficult datasets
 # revision 0.39 . Keitaro 4/2014 - automatically set ROTATION_AXIS=-1 0 0 for MX225HS at SPring-8 BL32XU.
 # revision 0.40 . Jan Gebauer /KD 4/2014 - simple implementation of MAR345 detector
-REVISION="0.40 (15-April-2014)"
+# revision 0.41 . recognize header starting with R-AXIS instead of RAXIS
+REVISION="0.41 (22-April-2014)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -110,6 +111,7 @@ egrep -qi 'marccd|Corrected' tmp2 && DET=mccd
 grep -q PILATUS tmp2             && DET=pilatus                              
 grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
 head -n1 tmp2 | grep -q "^RAXIS" && DET=raxis
+head -n1 tmp2 | grep -q "^R-AXIS" && DET=raxis
 grep -q mar345 tmp2		 && DET=MAR345                         
 
 # identify other detector types in the same way 
