@@ -1,7 +1,7 @@
 #!/bin/bash                                                                   
 # purpose: generate XDS.INP                                                   
 #                                                                             
-# tested with some datasets from ALS, SSRL, SLS, ESRF, BESSY, SPring-8 and PF; only MARCCD, ADSC/SMV, PILATUS, RAXIS (in-house) detectors; 
+# tested with some datasets from ALS, SSRL, SLS, ESRF, BESSY, SPring-8 and PF; only MAR, ADSC/SMV, PILATUS, RAXIS (in-house) detectors; 
 # for other detectors, values marked with XXX must be manually filled in.                                  
 #                                                                                                          
 # revision 0.03 . Kay Diederichs 2/2010                                                                    
@@ -41,7 +41,8 @@
 # revision 0.37 . Keitaro 10/2013 - fix for MX225HS detector on SPring-8 BL32XU (Ignore case when matching marccd in header); but cannot decide reverse-phi because of missing detector S/N
 # revision 0.38 . KD 2/2014 - change defaults for REFINE(IDXREF) and REFINE(INTEGRATE) such that more stable results are obtained for difficult datasets
 # revision 0.39 . Keitaro 4/2014 - automatically set ROTATION_AXIS=-1 0 0 for MX225HS at SPring-8 BL32XU.
-REVISION="0.39 (14-April-2014)"
+# revision 0.40 . Jan Gebauer /KD 4/2014 - simple implementation of MAR345 detector
+REVISION="0.40 (15-April-2014)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -81,7 +82,8 @@ QX=XXX
 QY=XXX                                                                                                           
 NX=XXX                                                                                                           
 NY=XXX                                                                                                           
-SENSOR_THICKNESS=0                                                                                               
+SENSOR_THICKNESS=0   
+TRUSTED_REGION="0.0 1.2 ! partially use corners of detector (0 1.4143: use all pixels)"                                                                                           
 # see how we are called:                                                                                         
 NAME_TEMPLATE_OF_DATA_FRAMES="$1"
 # list frames matching the wildcards in NAME_TEMPLATE_OF_DATA_FRAMES
@@ -108,7 +110,9 @@ egrep -qi 'marccd|Corrected' tmp2 && DET=mccd
 grep -q PILATUS tmp2             && DET=pilatus                              
 grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
 head -n1 tmp2 | grep -q "^RAXIS" && DET=raxis
-# identify other detector types in the same way (MAR IP would be straightforward)
+grep -q mar345 tmp2		 && DET=MAR345                         
+
+# identify other detector types in the same way 
 
 # parse ASCII header of first frame
 
@@ -291,6 +295,28 @@ elif [ "$DET" == "raxis" ]; then
   QY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(780);print "%.6f"%struct.unpack(">f",f.read(4))')
 
   X_RAY_WAVELENGTH=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(292);print "%.6f"%struct.unpack(">f",f.read(4))')
+
+elif [ "$DET" == "MAR345" ]; then
+  
+ echo  "Data from a Mar345 image plate detector"
+ DETECTOR="MAR345  MINIMUM_VALID_PIXEL_VALUE=0  OVERLOAD=130000"
+ NX=`awk '/FORMAT/{print $2}' tmp2`
+ NY=$NX
+ QX=`awk '/PIXEL/{print $3/1000.}' tmp2`
+ QY=`awk '/PIXEL/{print $5/1000.}' tmp2`
+ if grep -q 'CENTER' tmp2; then
+   echo Beam center found.
+   ORGX=`grep 'CENTER' tmp2 | awk '{print $3}'`
+   ORGY=`grep 'CENTER' tmp2 | awk '{print $5}'`
+ else
+   echo No beam center was found. Setting beam center to the middle of the detector.
+   ORGX=`echo $NX / 2 | bc`
+   ORGY=`echo $NY / 2 | bc`
+ fi
+ DETECTOR_DISTANCE=`grep 'DISTANCE' tmp2 | awk '{print $2}'`               
+ X_RAY_WAVELENGTH=`grep 'WAVELENGTH' tmp2 | awk '{print $2}'` 
+ OSCILLATION_RANGE=`grep 'PHI' tmp2 | awk '{print $5-$3}'`    
+ TRUSTED_REGION="0 0.99"        
 else
   echo should never come here
   exit 1                     
@@ -306,8 +332,7 @@ echo X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH
 cat > XDS.INP << eof
 ! written by generate_XDS.INP version $REVISION
 JOB= XYCORR INIT COLSPOT IDXREF DEFPIX INTEGRATE CORRECT
-ORGX= $ORGX ORGY= $ORGY  ! check these values with adxv !\
-$COMMENT_ORGXY
+ORGX= $ORGX ORGY= $ORGY  ! check these values with adxv !
 DETECTOR_DISTANCE= $DETECTOR_DISTANCE                    
 OSCILLATION_RANGE= $OSCILLATION_RANGE                    
 X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH                      
@@ -337,7 +362,7 @@ FRIEDEL'S_LAW=FALSE     ! This acts only on the CORRECT step
 ! UNTRUSTED_QUADRILATERAL= x1 y1 x2 y2 x3 y3 x4 y4 ! see documentation
 !
 ! parameters with changes wrt default values:
-TRUSTED_REGION=0.00 1.2  ! partially use corners of detectors; 1.41421=full use
+TRUSTED_REGION=$TRUSTED_REGION
 VALUE_RANGE_FOR_TRUSTED_DETECTOR_PIXELS=6000. 30000. ! often 7000 or 8000 is ok
 STRONG_PIXEL=4           ! COLSPOT: only use strong reflections (default is 3)
 MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=3 ! default of 6 is sometimes too high
