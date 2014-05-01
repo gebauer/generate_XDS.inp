@@ -44,7 +44,8 @@
 # revision 0.40 . Jan Gebauer /KD 4/2014 - simple implementation of MAR345 detector
 # revision 0.41 . recognize header starting with R-AXIS instead of RAXIS
 # revision 0.42 . Keitaro 5/2014 automatically set ROTATION_AXIS=-1 0 0 for Q315 at SPring-8 BL38B1.
-REVISION="0.42 (01-May-2014)"
+# revision 0.43 . Keitaro 5/2014 add experimental support of dTREK format (raxis_smv)
+REVISION="0.43 (01-May-2014)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -113,6 +114,7 @@ grep -q PILATUS tmp2             && DET=pilatus
 grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
 head -n1 tmp2 | grep -q "^RAXIS" && DET=raxis
 head -n1 tmp2 | grep -q "^R-AXIS" && DET=raxis
+grep -q "^DETECTOR_TYPE=RAXIS" tmp2 && DET=raxis_smv
 grep -q mar345 tmp2		 && DET=MAR345                         
 
 # identify other detector types in the same way 
@@ -308,6 +310,55 @@ elif [ "$DET" == "raxis" ]; then
 
   X_RAY_WAVELENGTH=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(292);print "%.6f"%struct.unpack(">f",f.read(4))')
 
+elif [ "$DET" == "raxis_smv" ]; then
+  echo "Data from a RAXIS detector with SMV header (dTREK image)"
+
+  DETECTOR="RAXIS MINIMUM_VALID_PIXEL_VALUE=0"
+
+  sed s/\;// tmp2 > tmp1
+  mv tmp1 tmp2
+
+  # find OVERLOAD
+  SATURATED_VALUE=`grep SATURATED_VALUE tmp2 | head -1 | sed s/SATURATED_VALUE=//`
+  DETECTOR="${DETECTOR}  OVERLOAD=${SATURATED_VALUE}"
+
+  # find X_RAY_WAVELENGTH:
+  X_RAY_WAVELENGTH=(`grep SOURCE_WAVELENGTH tmp2 | head -1 | sed s/SOURCE_WAVELENGTH=//`)
+  X_RAY_WAVELENGTH=${X_RAY_WAVELENGTH[1]}
+
+  # find NX,NY,QX,QY
+  # NOTE that "RX_" may be different. probably we should check DETECTOR_NAMES= in header (RX_ is expected currently).
+  # NX,NY should be read from RX_DETECTOR_DIMENSIONS?
+  NX=`grep SIZE1 tmp2 | tail -1 | sed s/SIZE1=//`
+  NY=`grep SIZE2 tmp2 | tail -1 | sed s/SIZE2=//`
+  DET_SIZE=(`grep RX_DETECTOR_SIZE tmp2 | tail -1 | sed s/RX_DETECTOR_SIZE=//`)
+  QX=`echo "scale=1; ${DET_SIZE[0]} / $NX" | bc -l`
+  QY=`echo "scale=1; ${DET_SIZE[1]} / $NY" | bc -l`
+
+  # find ORGX, ORGY
+  SPATIAL_DISTORTION_INFO=(`grep RX_SPATIAL_DISTORTION_INFO tmp2 | tail -1 | sed s/RX_SPATIAL_DISTORTION_INFO=//`)
+  ORGX=${SPATIAL_DISTORTION_INFO[0]}
+  ORGY=${SPATIAL_DISTORTION_INFO[1]}
+
+  # find DETECTOR_DISTANCE 
+  GONIO_NAMES=(`grep RX_GONIO_NAMES tmp2 | tail -1 | sed s/RX_GONIO_NAMES=//`)
+  GONIO_VALUES=(`grep RX_GONIO_VALUES tmp2 | tail -1 | sed s/RX_GONIO_VALUES=//`)
+  GONIO_UNITS=(`grep RX_GONIO_UNITS tmp2 | tail -1 | sed s/RX_GONIO_UNITS=//`)
+  for i in `seq 1 ${#GONIO_NAMES[*]}`
+  do
+   idx=$((i-1))
+   if [ "${GONIO_NAMES[$idx]}" == "Distance" ]; then
+    DETECTOR_DISTANCE="-${GONIO_VALUES[$idx]}"
+    # TODO: Check unit!! - ${GONIO_UNITS[$idx]}
+   fi
+  done
+
+  # find OSCILLATION_RANGE
+  ROTATION=(`grep "^ROTATION=" tmp2 | tail -1 | sed s/ROTATION=//`)
+  OSCILLATION_RANGE=${ROTATION[2]}
+
+  # NOTE: how can we know correct ROTATION_AXIS=?
+
 elif [ "$DET" == "MAR345" ]; then
   
  echo  "Data from a Mar345 image plate detector"
@@ -393,7 +444,7 @@ SENSOR_THICKNESS= $SENSOR_THICKNESS
 NX= $NX NY= $NY  QX= $QX  QY= $QY ! to make CORRECT happy if frames are unavailable
 
 eof
-if [ "$DET" == "raxis" ]; then
+if [ "$DET" == "raxis" -o "$DET" == "raxis_smv" ]; then
  cat >> XDS.INP << eof
 DIRECTION_OF_DETECTOR_X-AXIS=1 0 0
 DIRECTION_OF_DETECTOR_Y-AXIS=0 -1 0
