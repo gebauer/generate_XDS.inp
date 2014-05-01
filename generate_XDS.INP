@@ -43,7 +43,8 @@
 # revision 0.39 . Keitaro 4/2014 - automatically set ROTATION_AXIS=-1 0 0 for MX225HS at SPring-8 BL32XU.
 # revision 0.40 . Jan Gebauer /KD 4/2014 - simple implementation of MAR345 detector
 # revision 0.41 . recognize header starting with R-AXIS instead of RAXIS
-REVISION="0.41 (22-April-2014)"
+# revision 0.42 . Keitaro 5/2014 automatically set ROTATION_AXIS=-1 0 0 for Q315 at SPring-8 BL38B1.
+REVISION="0.42 (01-May-2014)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -227,7 +228,7 @@ elif [ "$DET" == "adsc" ]; then
       ORGY3=`echo "scale=1; $NX-$BEAM_CENTER_Y/$QX" | bc -l `
       echo - at e.g. ALS 8.2.2 use: ORGX=$ORGX3 ORGY=$ORGY3 - this is written to XDS.INP                              
       COMMENT_ORGXY="${COMMENT_ORGXY}
-! ORGX= $ORGX3 ORGY= $ORGY3 ! For ALS 8.2.2,.."
+! ORGX= $ORGX3 ORGY= $ORGY3 ! For ALS 8.2.2, SPring-8,.."
 # the latter alternative is written into the generated XDS.INP ! You have to correct this manually in XDS.INP, or adjust this script.
 
       # Decision of beam center convention based on detector serial numbers.
@@ -245,6 +246,15 @@ elif [ "$DET" == "adsc" ]; then
       else
        ORGX=$ORGX3
        ORGY=$ORGY3
+      fi
+
+      # Check detector serial number and recognize beamline for reversed-phi setting.
+      # Known detectors for reversed-phi in SPring-8: 915: BL38B1 Q315
+      REVERSEPHI_SNs="
+915
+"
+      if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
+        REVERSE_PHI="yes"
       fi
 
       # find DETECTOR_DISTANCE and OSCILLATION_RANGE:                                                                                
@@ -334,7 +344,8 @@ echo X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH
 cat > XDS.INP << eof
 ! written by generate_XDS.INP version $REVISION
 JOB= XYCORR INIT COLSPOT IDXREF DEFPIX INTEGRATE CORRECT
-ORGX= $ORGX ORGY= $ORGY  ! check these values with adxv !
+ORGX= $ORGX ORGY= $ORGY  ! check these values with adxv !\
+$COMMENT_ORGXY
 DETECTOR_DISTANCE= $DETECTOR_DISTANCE                    
 OSCILLATION_RANGE= $OSCILLATION_RANGE                    
 X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH                      
