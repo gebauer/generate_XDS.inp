@@ -45,9 +45,10 @@
 # revision 0.41 . recognize header starting with R-AXIS instead of RAXIS
 # revision 0.42 . Keitaro 5/2014 automatically set ROTATION_AXIS=-1 0 0 for Q315 at SPring-8 BL38B1.
 # revision 0.43 . Keitaro 5/2014 add experimental support of dTREK format (raxis_smv)
-REVISION="0.43 (01-May-2014)"
+# revision 0.44 . Keitaro 5/2014 automatically set ROTATION_AXIS=-1 0 0 for PILATUS3 at SPring-8 BL41XU.
+REVISION="0.44 (14-May-2014)"
 #                                                                                                            
-# usage: e.g. generate_XDS.INP "frms/mydata_1_???.img"                                                       
+# usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
 # the ? are wildcards for the frame numbers.                                                                 
 #                                                                                                            
@@ -67,7 +68,7 @@ REVISION="0.43 (01-May-2014)"
 echo generate_XDS.INP version $REVISION . Obtain the latest version from                                         
 echo http://strucbio.biologie.uni-konstanz.de/xdswiki/index.php/generate_XDS.INP                                 
 if [ "$1" == "help" ] || [ "$1" == "-help" ] || [ "$1" == "-h" ]; then                                           
-  echo usage: generate_XDS.INP \"frms/mydata_1_???.img\"   \(_with_ the quotation marks!\)                       
+  echo usage: generate_XDS.INP \"/file/system/frms/mydata_1_???.img\"   \(_with_ the quotation marks!\)                       
   echo if the frames are compressed with bzip2, leave out the .bz2 extension!                                    
   exit                                                                                                           
 fi                                                                                                               
@@ -288,6 +289,16 @@ elif [ "$DET" == "pilatus" ]; then
       DETECTOR_DISTANCE=`echo "$DETECTOR_DISTANCE*1000" | bc -l`
 
       OSCILLATION_RANGE=`awk '/Angle/{print $2}' tmp2`
+
+      # get detector serial number and check if it is included in the list
+      # Known detectors for reversed-phi in SPring-8: BL41XU PILATUS3 6M 60-0125
+      DET_SN=`grep "Detector:" tmp2 | sed "s/^.*Detector: \?//"`
+      REVERSEPHI_SNs="
+PILATUS3 6M, S/N 60-0125
+"
+      if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
+        REVERSE_PHI="yes"
+      fi
 
 elif [ "$DET" == "raxis" ]; then
   echo Data from a RAXIS detector
