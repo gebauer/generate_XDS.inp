@@ -46,7 +46,8 @@
 # revision 0.42 . Keitaro 5/2014 automatically set ROTATION_AXIS=-1 0 0 for Q315 at SPring-8 BL38B1.
 # revision 0.43 . Keitaro 5/2014 add experimental support of dTREK format (raxis_smv)
 # revision 0.44 . Keitaro 5/2014 automatically set ROTATION_AXIS=-1 0 0 for PILATUS3 at SPring-8 BL41XU.
-REVISION="0.44 (14-May-2014)"
+# revision 0.45 . KD cope with blanks in filenames
+REVISION="0.45 (28-May-2014)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -92,8 +93,10 @@ TRUSTED_REGION="0.0 1.2 ! partially use corners of detector (0 1.4143: use all p
 NAME_TEMPLATE_OF_DATA_FRAMES="$1"
 # list frames matching the wildcards in NAME_TEMPLATE_OF_DATA_FRAMES
 # don't accept the "direct beam" shot at SLS/Pilatus PX-I and PX-II 
+# cope with blanks in directory / file name
+IFS=$'\n'
 /bin/ls -C1 $1 $1.bz2 2>/dev/null | egrep -v "_00000.cbf|_000.img" > tmp1 || exit 1
-
+unset IFS
 # we can continue - the frames are found
 
 # set upper limit of DATA_RANGE to number of frames (see "limitations" above)
@@ -106,10 +109,15 @@ SPOT_RANGE=`echo "if ($SPOT_RANGE<1) 1;if ($SPOT_RANGE>1) $SPOT_RANGE" | bc -l`
 echo DATA_RANGE=1 $DATA_RANGE
 
 # find out detector type
-DET=XXX                 
+DET=XXX              
+IFS=$'\n'    
 FIRSTFRAME=`head -1 tmp1`
 echo $FIRSTFRAME | grep -q bz2 && bzcat $FIRSTFRAME > tmp1 && FIRSTFRAME=tmp1
-strings $FIRSTFRAME > tmp2                                                   
+strings $FIRSTFRAME > tmp2   
+unset IFS
+# TODO: whenever FIRSTFRAME is used below, it should be copied to tmp2 (using IFS as above), and tmp2 should be used instead
+# this was done for "mccd", but still has to be done for the "raxis" detector types
+# the reason is that FIRSTFRAME may contain a blank, which makes some commands fail                                                
 egrep -qi 'marccd|Corrected' tmp2 && DET=mccd                                 
 grep -q PILATUS tmp2             && DET=pilatus                              
 grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
@@ -150,35 +158,38 @@ elif [ "$DET" == "mccd" ]; then
   fi
 
   # offsets are documented; values can be found in mccd_xdsparams.pl script
+  IFS=$'\n'
+  cp $FIRSTFRAME tmp2
+  unset IFS
   let SKIP=1024+80                                                        
-  NX=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}')
+  NX=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')
   let SKIP=$SKIP+4                                                                         
-  NY=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}')
+  NY=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')
 
   let SKIP=1720
-  DETECTOR_DISTANCE=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}')
+  DETECTOR_DISTANCE=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')
   DETECTOR_DISTANCE=`echo "scale=3; $DETECTOR_DISTANCE/1000" | bc -l`                                     
                                                                                                           
   let SKIP=1024+256+128+256+4                                                                             
-  ORGX=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}')             
+  ORGX=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')             
   ORGX=`echo "scale=2; $ORGX/1000" | bc -l `                                                              
   let SKIP=$SKIP+4                                                                                        
-  ORGY=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}')             
+  ORGY=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')             
   ORGY=`echo "scale=2; $ORGY/1000" | bc -l `                                                              
 
   let SKIP=1024+736
-  OSCILLATION_RANGE=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}') 
+  OSCILLATION_RANGE=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}') 
   OSCILLATION_RANGE=`echo "scale=3; $OSCILLATION_RANGE/1000" | bc -l`   
                                                                                                  
   let SKIP=1024+256+128+256+128+4                                                                
-  QX=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}')      
+  QX=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')      
   QX=`echo "scale=10; $QX/1000000" |bc -l `                                                      
   let SKIP=$SKIP+4                                                                               
-  QY=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}')      
+  QY=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')      
   QY=`echo "scale=10; $QY/1000000" |bc -l `                                                      
 
   let SKIP=1024+256+128+256+128+128+12
-  X_RAY_WAVELENGTH=$(od -t dI -j $SKIP -N 4 $FIRSTFRAME | head -1 | awk '{print $2}')
+  X_RAY_WAVELENGTH=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')
   X_RAY_WAVELENGTH=`echo "scale=5; $X_RAY_WAVELENGTH/100000" | bc -l`                                    
 
 # at most BLs, ORGX and ORGY are in pixels, but sometimes in mm ... guess:
