@@ -47,7 +47,8 @@
 # revision 0.43 . Keitaro 5/2014 add experimental support of dTREK format (raxis_smv)
 # revision 0.44 . Keitaro 5/2014 automatically set ROTATION_AXIS=-1 0 0 for PILATUS3 at SPring-8 BL41XU.
 # revision 0.45 . KD cope with blanks in filenames
-REVISION="0.45 (28-May-2014)"
+# revision 0.46 . Keitaro 6/2014 automatically set ROTATION_AXIS=-1 0 0 for Mar225 at SPring-8 BL26B2.
+REVISION="0.46 (17-Jun-2014)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -143,8 +144,9 @@ elif [ "$DET" == "mccd" ]; then
   # use first frame of dataset to obtain parameters               
 
   # Check detector serial number and recognize beamline for reversed-phi setting.
-  # Known detectors for reversed-phi in SPring-8: 31: BL32XU MX225HE, 38: BL44XU MX225HE, 42: BL44XU MX300HE, 40: BL41XU MX225HE, 106: BL32XU MX225HS
+  # Known detectors for reversed-phi in SPring-8: 24: BL26B2 Mar225, 31: BL32XU MX225HE, 38: BL44XU MX225HE, 42: BL44XU MX300HE, 40: BL41XU MX225HE, 106: BL32XU MX225HS
   REVERSEPHI_SNs="
+24
 31
 38
 40
@@ -452,7 +454,8 @@ TRUSTED_REGION=$TRUSTED_REGION
 VALUE_RANGE_FOR_TRUSTED_DETECTOR_PIXELS=6000. 30000. ! often 7000 or 8000 is ok
 STRONG_PIXEL=4           ! COLSPOT: only use strong reflections (default is 3)
 MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=3 ! default of 6 is sometimes too high
-! close spots: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 6 and 3, e.g. to 4 and 2
+! close spots/long cell ais: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 6 and 3
+! SEPMIN=4  CLUSTER_RADIUS=2
 ! nowadays headers are usually correct so refine DISTANCE in INTEGRATE but not IDXREF
 REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS ! DISTANCE
 REFINE(INTEGRATE)= DISTANCE BEAM ORIENTATION ! AXIS CELL
