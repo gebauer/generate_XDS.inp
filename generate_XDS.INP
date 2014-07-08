@@ -48,7 +48,8 @@
 # revision 0.44 . Keitaro 5/2014 automatically set ROTATION_AXIS=-1 0 0 for PILATUS3 at SPring-8 BL41XU.
 # revision 0.45 . KD cope with blanks in filenames
 # revision 0.46 . Keitaro 6/2014 automatically set ROTATION_AXIS=-1 0 0 for Mar225 at SPring-8 BL26B2.
-REVISION="0.46 (17-Jun-2014)"
+# revision 0.47 . Keitaro 7/2014 more generic dTREK format support (Saturn and RAXIS)
+REVISION="0.47 (08-Jul-2014)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -124,7 +125,7 @@ grep -q PILATUS tmp2             && DET=pilatus
 grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
 head -n1 tmp2 | grep -q "^RAXIS" && DET=raxis
 head -n1 tmp2 | grep -q "^R-AXIS" && DET=raxis
-grep -q "^DETECTOR_TYPE=RAXIS" tmp2 && DET=raxis_smv
+grep -q "^SOURCE_WAVELENGTH=1" tmp2 && DET=dtrek
 grep -q mar345 tmp2		 && DET=MAR345                         
 
 # identify other detector types in the same way 
@@ -334,13 +335,26 @@ elif [ "$DET" == "raxis" ]; then
 
   X_RAY_WAVELENGTH=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(292);print "%.6f"%struct.unpack(">f",f.read(4))')
 
-elif [ "$DET" == "raxis_smv" ]; then
-  echo "Data from a RAXIS detector with SMV header (dTREK image)"
-
-  DETECTOR="RAXIS MINIMUM_VALID_PIXEL_VALUE=0"
+elif [ "$DET" == "dtrek" ]; then
+  echo "Data from a RAXIS or Saturn detector with dTREK format"
 
   sed s/\;// tmp2 > tmp1
   mv tmp1 tmp2
+
+  dname=`grep "DETECTOR_NAMES=" tmp2 | sed -e "s/.*=//"`
+
+  if [ "$dname" == "CCD_" ]; then
+    DETECTOR="SATURN MINIMUM_VALID_PIXEL_VALUE=1"
+    dtrek_det="saturn"
+  else # should be RX_
+    DETECTOR="RAXIS MINIMUM_VALID_PIXEL_VALUE=0"
+    dtrek_det="raxis"
+  fi
+
+  # Saturn on SPring-8 BL26B1
+  if grep "CCD_DETECTOR_IDENTIFICATION=MSC_REIT_A200_SN09250183" tmp2 > /dev/null; then
+   REVERSE_PHI="yes"
+  fi
 
   # find OVERLOAD
   SATURATED_VALUE=`grep SATURATED_VALUE tmp2 | head -1 | sed s/SATURATED_VALUE=//`
@@ -351,23 +365,22 @@ elif [ "$DET" == "raxis_smv" ]; then
   X_RAY_WAVELENGTH=${X_RAY_WAVELENGTH[1]}
 
   # find NX,NY,QX,QY
-  # NOTE that "RX_" may be different. probably we should check DETECTOR_NAMES= in header (RX_ is expected currently).
-  # NX,NY should be read from RX_DETECTOR_DIMENSIONS?
+  # NX,NY should be read from *_DETECTOR_DIMENSIONS?
   NX=`grep SIZE1 tmp2 | tail -1 | sed s/SIZE1=//`
   NY=`grep SIZE2 tmp2 | tail -1 | sed s/SIZE2=//`
-  DET_SIZE=(`grep RX_DETECTOR_SIZE tmp2 | tail -1 | sed s/RX_DETECTOR_SIZE=//`)
-  QX=`echo "scale=1; ${DET_SIZE[0]} / $NX" | bc -l`
-  QY=`echo "scale=1; ${DET_SIZE[1]} / $NY" | bc -l`
+  DET_SIZE=(`grep ${dname}DETECTOR_SIZE tmp2 | tail -1 | sed s/.*_DETECTOR_SIZE=//`)
+  QX=`echo "scale=6; ${DET_SIZE[0]} / $NX" | bc -l`
+  QY=`echo "scale=6; ${DET_SIZE[1]} / $NY" | bc -l`
 
   # find ORGX, ORGY
-  SPATIAL_DISTORTION_INFO=(`grep RX_SPATIAL_DISTORTION_INFO tmp2 | tail -1 | sed s/RX_SPATIAL_DISTORTION_INFO=//`)
+  SPATIAL_DISTORTION_INFO=(`grep ${dname}SPATIAL_DISTORTION_INFO tmp2 | tail -1 | sed s/.*_SPATIAL_DISTORTION_INFO=//`)
   ORGX=${SPATIAL_DISTORTION_INFO[0]}
   ORGY=${SPATIAL_DISTORTION_INFO[1]}
 
   # find DETECTOR_DISTANCE 
-  GONIO_NAMES=(`grep RX_GONIO_NAMES tmp2 | tail -1 | sed s/RX_GONIO_NAMES=//`)
-  GONIO_VALUES=(`grep RX_GONIO_VALUES tmp2 | tail -1 | sed s/RX_GONIO_VALUES=//`)
-  GONIO_UNITS=(`grep RX_GONIO_UNITS tmp2 | tail -1 | sed s/RX_GONIO_UNITS=//`)
+  GONIO_NAMES=(`grep ${dname}GONIO_NAMES tmp2 | tail -1 | sed s/.*_GONIO_NAMES=//`)
+  GONIO_VALUES=(`grep ${dname}GONIO_VALUES tmp2 | tail -1 | sed s/.*_GONIO_VALUES=//`)
+  GONIO_UNITS=(`grep ${dname}GONIO_UNITS tmp2 | tail -1 | sed s/.*_GONIO_UNITS=//`)
   for i in `seq 1 ${#GONIO_NAMES[*]}`
   do
    idx=$((i-1))
@@ -469,7 +482,7 @@ SENSOR_THICKNESS= $SENSOR_THICKNESS
 NX= $NX NY= $NY  QX= $QX  QY= $QY ! to make CORRECT happy if frames are unavailable
 
 eof
-if [ "$DET" == "raxis" -o "$DET" == "raxis_smv" ]; then
+if [ "$DET" == "raxis" -o "$dtrek_det" == "raxis" ]; then
  cat >> XDS.INP << eof
 DIRECTION_OF_DETECTOR_X-AXIS=1 0 0
 DIRECTION_OF_DETECTOR_Y-AXIS=0 -1 0
@@ -484,9 +497,18 @@ else
  else
   echo 'ROTATION_AXIS=-1 0 0  ! if this is wrong, please contact author.' >> XDS.INP
  fi
+ if [ "$dtrek_det" == "saturn" ]; then
+ cat >> XDS.INP << eof
+DIRECTION_OF_DETECTOR_X-AXIS=-1 0 0
+DIRECTION_OF_DETECTOR_Y-AXIS= 0 1 0
+eof
+ else
  cat >> XDS.INP << eof
 DIRECTION_OF_DETECTOR_X-AXIS=1 0 0
 DIRECTION_OF_DETECTOR_Y-AXIS=0 1 0
+eof
+ fi
+ cat >> XDS.INP << eof
 INCIDENT_BEAM_DIRECTION=0 0 1
 FRACTION_OF_POLARIZATION=0.98   ! better value is provided by beamline staff!
 POLARIZATION_PLANE_NORMAL=0 1 0
