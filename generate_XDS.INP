@@ -49,7 +49,8 @@
 # revision 0.45 . KD cope with blanks in filenames
 # revision 0.46 . Keitaro 6/2014 automatically set ROTATION_AXIS=-1 0 0 for Mar225 at SPring-8 BL26B2.
 # revision 0.47 . Keitaro 7/2014 more generic dTREK format support (Saturn and RAXIS)
-REVISION="0.47 (08-Jul-2014)"
+# revision 0.48 . Kip Guja 11/2014 add detector serial number for ALS 5.0.2 to beam center convention 1 
+REVISION="0.48 (24-Nov-2014)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -228,7 +229,7 @@ elif [ "$DET" == "adsc" ]; then
 # fix 2010-04-26 - tell user about possible ORGX, ORGY alternatives -  
       COMMENT_ORGXY="
 ! Following are possible beam center interpretations for ADSC detectors"
-# at ESRF, PF, and ... (pls fill in!) the following should be used:         
+# at ESRF, PF, ALS 5.0.2 and ... (pls fill in!) the following should be used:         
       ORGX1=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l`
       ORGY1=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l`
       echo - at ESRF,PF BLs use: ORGX=$ORGX1 ORGY=$ORGY1                    
@@ -250,12 +251,13 @@ elif [ "$DET" == "adsc" ]; then
 
       # Decision of beam center convention based on detector serial numbers.
       DET_SN=`grep DETECTOR_SN tmp2 | sed -e "s/DETECTOR_SN=//"`
-      # For convention 1; Known PF detectors = 449: NW12A Q210, 472: NE3A Q270, 474: BL17A Q270, 912: BL5A Q315
+      # For convention 1; Known PF detectors = 449: NW12A Q210, 472: NE3A Q270, 474: BL17A Q270, 912: BL5A Q315, 923: ALS BL5.0.2 Q315
       ORG1_SNs="
 449
 472
 474
 912
+923
 "
       if echo "${DET_SN}${ORG1_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
        ORGX=$ORGX1
