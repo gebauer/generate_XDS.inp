@@ -51,7 +51,8 @@
 # revision 0.47 . Keitaro 7/2014 more generic dTREK format support (Saturn and RAXIS)
 # revision 0.48 . Kip Guja 11/2014 add detector serial number for ALS 5.0.2 to beam center convention 1 
 # revision 0.49 . Nobuhisa 2/2015 add  detector serial number for AichiSR BL2S1 to beam center convention 1
-REVISION="0.49 (26-Feb-2015)"
+# revision 0.50 . KD 03/2015 workaround for Mar-1 change of parameter name "DISTANCE" to "POSITION" in REFINE(*) keywords
+REVISION="0.50 (01-Mar-2015)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -471,12 +472,13 @@ TRUSTED_REGION=$TRUSTED_REGION
 VALUE_RANGE_FOR_TRUSTED_DETECTOR_PIXELS=6000. 30000. ! often 7000 or 8000 is ok
 STRONG_PIXEL=4           ! COLSPOT: only use strong reflections (default is 3)
 MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=3 ! default of 6 is sometimes too high
-! close spots/long cell ais: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 6 and 3
-! SEPMIN=4  CLUSTER_RADIUS=2
-! nowadays headers are usually correct so refine DISTANCE in INTEGRATE but not IDXREF
-REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS ! DISTANCE
-REFINE(INTEGRATE)= DISTANCE BEAM ORIENTATION ! AXIS CELL
-! REFINE(CORRECT)=CELL BEAM ORIENTATION AXIS DISTANCE ! Default is: refine everything
+! close spots/long cell axis: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 6 and 3
+! SEPMIN=4  CLUSTER_RADIUS=2 ! should be default for Pilatus and other detectors with low PSF
+! since XDS 01-MAR-2015, POSITION is used instead of DISTANCE. Older versions do it the other way round.
+! nowadays headers are usually correct so refine DISTANCE/POSITION in INTEGRATE but not IDXREF
+REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS ! DISTANCE POSITION
+REFINE(INTEGRATE)= DISTANCE POSITION BEAM ORIENTATION ! AXIS CELL
+! REFINE(CORRECT)=CELL BEAM ORIENTATION AXIS DISTANCE POSITION ! Default is: refine everything
 
 ! parameters specifically for this detector and beamline:
 DETECTOR= $DETECTOR
@@ -533,6 +535,7 @@ cat >> XDS.INP << eof
 eof
 if [ "$DET" == "pilatus" ]; then
 cat >> XDS.INP << eof
+SEPMIN=4 CLUSTER_RADIUS=2
 NUMBER_OF_PROFILE_GRID_POINTS_ALONG_ALPHA/BETA=13 ! Default is 9 - Increasing may improve data 
 NUMBER_OF_PROFILE_GRID_POINTS_ALONG_GAMMA=13      ! accuracy, particularly if finely-sliced on phi, 
 !                                                   and does not seem to have any downsides. 
