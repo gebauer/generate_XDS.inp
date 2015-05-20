@@ -52,14 +52,12 @@
 # revision 0.48 . Kip Guja 11/2014 add detector serial number for ALS 5.0.2 to beam center convention 1 
 # revision 0.49 . Nobuhisa 2/2015 add  detector serial number for AichiSR BL2S1 to beam center convention 1
 # revision 0.50 . KD 03/2015 workaround for Mar-1 change of parameter name "DISTANCE" to "POSITION" in REFINE(*) keywords
-REVISION="0.50 (01-Mar-2015)"
+# revision 0.51 . Keitaro 03/2015 add .gz and .xz support and remove limitation - frame numbers can start with any.
+REVISION="0.51 (20-Mar-2015)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
 # the ? are wildcards for the frame numbers.                                                                 
-#                                                                                                            
-# limitations:                                                                                               
-# - frame numbers are assumed to start with 1 and run consecutively                                          
 #                                                                                                            
 # known problems:                                                                                            
 # - for ADSC detectors, there are at least three ways to obtain ORGX and ORGY values from the header (see below);
@@ -100,24 +98,35 @@ NAME_TEMPLATE_OF_DATA_FRAMES="$1"
 # don't accept the "direct beam" shot at SLS/Pilatus PX-I and PX-II 
 # cope with blanks in directory / file name
 IFS=$'\n'
-/bin/ls -C1 $1 $1.bz2 2>/dev/null | egrep -v "_00000.cbf|_000.img" > tmp1 || exit 1
+/bin/ls -C1 $1 $1.bz2 $1.gz $1.xz 2>/dev/null | egrep -v "_00000.cbf|_000.img" > tmp1 || exit 1
 unset IFS
 # we can continue - the frames are found
 
-# set upper limit of DATA_RANGE to number of frames (see "limitations" above)
-DATA_RANGE=`wc -l tmp1 | awk '{print $1}'`                                   
+# Find the first '?' position and the number of '?' to determine DATA_RANGE=.
+pos1=`echo "$1" | awk '{print index($0, "?")}'`
+pos2=`echo "$1" | sed -e "s/[^\?]//g" | awk '{print length+'$pos1' - 1'}`
+data_first=`cat tmp1 | cut -b $pos1-$pos2 | head -n1|bc`
+data_last=`cat tmp1 | cut -b $pos1-$pos2 | tail -n1|bc`
+DATA_RANGE="$data_first $data_last"
 
-# set upper limit of SPOT_RANGE to half of DATA_RANGE, but not less than 1
-SPOT_RANGE=`echo "scale=0; $DATA_RANGE/2" | bc -l`                        
-SPOT_RANGE=`echo "if ($SPOT_RANGE<1) 1;if ($SPOT_RANGE>1) $SPOT_RANGE" | bc -l`
+# set SPOT_RANGE to first half of DATA_RANGE
+data_num=`wc -l tmp1 | awk '{print $1}'`
+data_half=`echo "scale=0; $data_num/2" | bc -l`                        
+data_half=`echo "if ($data_half<=1) 1;if ($data_half>1) $data_half" | bc -l`
+spot_last=`echo "scale=0; $data_first+$data_half-1" | bc -l`
+SPOT_RANGE="$data_first $spot_last"
 
-echo DATA_RANGE=1 $DATA_RANGE
+echo DATA_RANGE=$DATA_RANGE
 
 # find out detector type
 DET=XXX              
 IFS=$'\n'    
 FIRSTFRAME=`head -1 tmp1`
-echo $FIRSTFRAME | grep -q bz2 && bzcat $FIRSTFRAME > tmp1 && FIRSTFRAME=tmp1
+echo $FIRSTFRAME | grep -q '\.bz2$' && bzcat $FIRSTFRAME > tmp1 && FIRSTFRAME=tmp1
+# for mac/linux compatibility. zcat foo.gz doesn't work on mac.
+echo $FIRSTFRAME | grep -q '\.gz$' && zcat < $FIRSTFRAME > tmp1 && FIRSTFRAME=tmp1
+echo $FIRSTFRAME | grep -q '\.xz$' && xzcat $FIRSTFRAME > tmp1 && FIRSTFRAME=tmp1
+
 strings $FIRSTFRAME > tmp2   
 unset IFS
 # TODO: whenever FIRSTFRAME is used below, it should be copied to tmp2 (using IFS as above), and tmp2 should be used instead
@@ -444,8 +453,8 @@ OSCILLATION_RANGE= $OSCILLATION_RANGE
 X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH                      
 NAME_TEMPLATE_OF_DATA_FRAMES=$NAME_TEMPLATE_OF_DATA_FRAMES
 ! REFERENCE_DATA_SET=xxx/XDS_ASCII.HKL ! e.g. to ensure consistent indexing  
-DATA_RANGE=1 $DATA_RANGE                                                     
-SPOT_RANGE=1 $SPOT_RANGE                                                     
+DATA_RANGE=$DATA_RANGE                                                     
+SPOT_RANGE=$SPOT_RANGE                                                     
 ! BACKGROUND_RANGE=1 10 ! rather use defaults (first 5 degree of rotation)   
 
 SPACE_GROUP_NUMBER=0                   ! 0 if unknown
@@ -484,7 +493,8 @@ REFINE(INTEGRATE)= DISTANCE POSITION BEAM ORIENTATION ! AXIS CELL
 DETECTOR= $DETECTOR
 SENSOR_THICKNESS= $SENSOR_THICKNESS
 ! attention CCD detectors: for very high resolution (better than 1A) make sure to specify SILICON
-! as about 32* what CORRECT.LP suggests (absorption of phosphor is much higher than that of silicon)
+! as about 32* what CORRECT.LP suggests (absorption of phosphor is much higher than that of silicon).
+! Better: read the article http://strucbio.biologie.uni-konstanz.de/xdswiki/index.php/SILICON .
 NX= $NX NY= $NY  QX= $QX  QY= $QY ! to make CORRECT happy if frames are unavailable
 
 eof
@@ -499,7 +509,7 @@ POLARIZATION_PLANE_NORMAL=1 0 0
 eof
 else
  if [ "$REVERSE_PHI" == "no" ]; then
-  echo 'ROTATION_AXIS=1 0 0  ! at e.g. Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8 this needs to be -1 0 0' >> XDS.INP
+  echo 'ROTATION_AXIS=1 0 0  ! at e.g. Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8, SSRF BL17U this needs to be -1 0 0' >> XDS.INP
  else
   echo 'ROTATION_AXIS=-1 0 0  ! if this is wrong, please contact author.' >> XDS.INP
  fi
