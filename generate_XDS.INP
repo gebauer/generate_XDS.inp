@@ -53,7 +53,8 @@
 # revision 0.49 . Nobuhisa 2/2015 add  detector serial number for AichiSR BL2S1 to beam center convention 1
 # revision 0.50 . KD 03/2015 workaround for Mar-1 change of parameter name "DISTANCE" to "POSITION" in REFINE(*) keywords
 # revision 0.51 . Keitaro 03/2015 add .gz and .xz support and remove limitation - frame numbers can start with any.
-REVISION="0.51 (20-Mar-2015)"
+# revision 0.52 . Keitaro 05/2015 fix ADSC beam center convention for SPring-8 and DET_SN acquisition for PILATUS (didn't work on Mac)
+REVISION="0.52 (25-May-2015)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -191,6 +192,7 @@ elif [ "$DET" == "mccd" ]; then
   let SKIP=$SKIP+4                                                                                        
   ORGY=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')             
   ORGY=`echo "scale=2; $ORGY/1000" | bc -l `                                                              
+# FIXME 25.5.2015: reverse ORGX and ORGY for BM14 @ ESRF (no serial number in header)
 
   let SKIP=1024+736
   OSCILLATION_RANGE=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}') 
@@ -243,9 +245,9 @@ elif [ "$DET" == "adsc" ]; then
 # at ESRF, PF, ALS 5.0.2 and ... (pls fill in!) the following should be used:         
       ORGX1=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l`
       ORGY1=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l`
-      echo - at ESRF,PF BLs use: ORGX=$ORGX1 ORGY=$ORGY1                    
+      echo - at ESRF, PF, APS Argonne BLs use: ORGX=$ORGX1 ORGY=$ORGY1                    
       COMMENT_ORGXY="${COMMENT_ORGXY}
-! ORGX= $ORGX1 ORGY= $ORGY1 ! For ESRF,PF,..."
+! ORGX= $ORGX1 ORGY= $ORGY1 ! For ESRF, PF, APS Argonne ..."
 # this 2nd alternative convention should be used at the following beamlines (pls complete the list): ALS 5.0.3, ...
       ORGX2=`echo "scale=1; $NX-$BEAM_CENTER_X/$QX" | bc -l `
       ORGY2=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l `
@@ -253,12 +255,18 @@ elif [ "$DET" == "adsc" ]; then
       COMMENT_ORGXY="${COMMENT_ORGXY}
 ! ORGX= $ORGX2 ORGY= $ORGY2 ! For ALS 5.0.3,.."
 # this 3rd alternative convention should be used at the following beamlines (pls complete the list): ALS 8.2.2, ... 
+# this alternative is written into the generated XDS.INP ! You have to correct this manually in XDS.INP, or adjust this script.
       ORGX3=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l `
       ORGY3=`echo "scale=1; $NX-$BEAM_CENTER_Y/$QX" | bc -l `
-      echo - at e.g. ALS 8.2.2 use: ORGX=$ORGX3 ORGY=$ORGY3 - this is written to XDS.INP                              
+      echo - at e.g. ALS 8.2.2 use: ORGX=$ORGX3 ORGY=$ORGY3 - this is written to XDS.INP if beamline is not detected
       COMMENT_ORGXY="${COMMENT_ORGXY}
-! ORGX= $ORGX3 ORGY= $ORGY3 ! For ALS 8.2.2, SPring-8,.."
-# the latter alternative is written into the generated XDS.INP ! You have to correct this manually in XDS.INP, or adjust this script.
+! ORGX= $ORGX3 ORGY= $ORGY3 ! For ALS 8.2.2,.."
+# this 4th alternative convention should be used at the following beamlines (pls complete the list): SPring-8, ...
+      ORGX4=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l `
+      ORGY4=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l `
+      echo - at e.g. SPring-8 use: ORGX=$ORGX4 ORGY=$ORGY4 
+      COMMENT_ORGXY="${COMMENT_ORGXY}
+! ORGX= $ORGX4 ORGY= $ORGY4 ! For SPring-8,.."
 
       # Decision of beam center convention based on detector serial numbers.
       DET_SN=`grep DETECTOR_SN tmp2 | sed -e "s/DETECTOR_SN=//"`
@@ -271,9 +279,15 @@ elif [ "$DET" == "adsc" ]; then
 923
 933
 "
+      ORG4_SNs="
+915
+"
       if echo "${DET_SN}${ORG1_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
        ORGX=$ORGX1
        ORGY=$ORGY1
+      elif echo "${DET_SN}${ORG4_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
+       ORGX=$ORGX4
+       ORGY=$ORGY4
       else
        ORGX=$ORGX3
        ORGY=$ORGY3
@@ -320,7 +334,7 @@ elif [ "$DET" == "pilatus" ]; then
 
       # get detector serial number and check if it is included in the list
       # Known detectors for reversed-phi in SPring-8: BL41XU PILATUS3 6M 60-0125
-      DET_SN=`grep "Detector:" tmp2 | sed "s/^.*Detector: \?//"`
+      DET_SN=`grep "Detector:" tmp2 | sed "s/^.*Detector: *//"`
       REVERSEPHI_SNs="
 PILATUS3 6M, S/N 60-0125
 "
