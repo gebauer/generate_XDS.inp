@@ -54,7 +54,8 @@
 # revision 0.50 . KD 03/2015 workaround for Mar-1 change of parameter name "DISTANCE" to "POSITION" in REFINE(*) keywords
 # revision 0.51 . Keitaro 03/2015 add .gz and .xz support and remove limitation - frame numbers can start with any.
 # revision 0.52 . Keitaro 05/2015 fix ADSC beam center convention for SPring-8 and DET_SN acquisition for PILATUS (didn't work on Mac)
-REVISION="0.52 (25-May-2015)"
+# revision 0.53 . KD add ADSC beam center convention for APS Argonne but only as commented line in XDS.INP (not detector serial no)
+REVISION="0.53 (02-Nov-2015)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
