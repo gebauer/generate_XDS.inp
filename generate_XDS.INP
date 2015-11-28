@@ -56,7 +56,8 @@
 # revision 0.52 . Keitaro 05/2015 fix ADSC beam center convention for SPring-8 and DET_SN acquisition for PILATUS (didn't work on Mac)
 # revision 0.53 . KD add ADSC beam center convention for APS Argonne but only as commented line in XDS.INP (not detector serial no)
 # revision 0.54 . KD add ADSC S/N 911 for APS Argonne, and fix spurious output arising from THETADISTANCE (?!)
-REVISION="0.54 (27-Nov-2015)"
+# revision 0.55 . KD add ADSC S/N 446 for APS, and check w/ 12 datasets from data.sbgrid.org. No rule found: S/N 916 @ APS 24_ID_E !
+REVISION="0.55 (data.sbgrid.org edition 28-Nov-2015)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -281,6 +282,7 @@ elif [ "$DET" == "adsc" ]; then
 923
 933
 911
+446
 "
       ORG4_SNs="
 915
