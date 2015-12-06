@@ -59,7 +59,7 @@
 # revision 0.55 . KD add ADSC S/N 446 for APS, and check w/ 12 datasets from data.sbgrid.org. No rule found: S/N 916 @ APS 24_ID_E !
 # revision 0.56 . Keitaro 12/2015 show error message when user's input didn't match any files
 # revision 0.57 . KD 12/2015 start to take care of vertical ROTATION_AXIS at Diamond I24 - for now only introduce comment
-REVISION="0.56 (1-Dec-2015)"
+REVISION="0.57 (6-Dec-2015)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
