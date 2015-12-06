@@ -57,7 +57,9 @@
 # revision 0.53 . KD add ADSC beam center convention for APS Argonne but only as commented line in XDS.INP (not detector serial no)
 # revision 0.54 . KD add ADSC S/N 911 for APS Argonne, and fix spurious output arising from THETADISTANCE (?!)
 # revision 0.55 . KD add ADSC S/N 446 for APS, and check w/ 12 datasets from data.sbgrid.org. No rule found: S/N 916 @ APS 24_ID_E !
-REVISION="0.55 (data.sbgrid.org edition 28-Nov-2015)"
+# revision 0.56 . Keitaro 12/2015 show error message when user's input didn't match any files
+# revision 0.57 . KD 12/2015 start to take care of vertical ROTATION_AXIS at Diamond I24 - for now only introduce comment
+REVISION="0.56 (1-Dec-2015)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -102,7 +104,13 @@ NAME_TEMPLATE_OF_DATA_FRAMES="$1"
 # don't accept the "direct beam" shot at SLS/Pilatus PX-I and PX-II 
 # cope with blanks in directory / file name
 IFS=$'\n'
-/bin/ls -C1 $1 $1.bz2 $1.gz $1.xz 2>/dev/null | egrep -v "_00000.cbf|_000.img" > tmp1 || exit 1
+/bin/ls -C1 $1 $1.bz2 $1.gz $1.xz 2>/dev/null | egrep -v "_00000.cbf|_000.img" > tmp1
+if [ ! -s tmp1 ]
+then
+ echo "Error! No files matched: $1"
+ rm -f tmp1
+ exit 1
+fi
 unset IFS
 # we can continue - the frames are found
 
@@ -528,7 +536,7 @@ POLARIZATION_PLANE_NORMAL=1 0 0
 eof
 else
  if [ "$REVERSE_PHI" == "no" ]; then
-  echo 'ROTATION_AXIS=1 0 0  ! at e.g. Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8, SSRF BL17U this needs to be -1 0 0' >> XDS.INP
+  echo 'ROTATION_AXIS=1 0 0  ! Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8, SSRF BL17U need -1 0 0. Diamond ID24 needs 0 -1 0' >> XDS.INP
  else
   echo 'ROTATION_AXIS=-1 0 0  ! if this is wrong, please contact author.' >> XDS.INP
  fi
