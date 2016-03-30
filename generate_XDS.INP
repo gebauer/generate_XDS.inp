@@ -59,7 +59,8 @@
 # revision 0.55 . KD add ADSC S/N 446 for APS, and check w/ 12 datasets from data.sbgrid.org. No rule found: S/N 916 @ APS 24_ID_E !
 # revision 0.56 . Keitaro 12/2015 show error message when user's input didn't match any files
 # revision 0.57 . KD 12/2015 start to take care of vertical ROTATION_AXIS at Diamond I24 - for now only introduce comment
-REVISION="0.57 (6-Dec-2015)"
+# revision 0.58 . Keitaro 01/2016 fix for dTREK image: take 'rotation axis' information from header
+REVISION="0.58 (18-Jan-2016)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -149,7 +150,7 @@ grep -q PILATUS tmp2             && DET=pilatus
 grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
 head -n1 tmp2 | grep -q "^RAXIS" && DET=raxis
 head -n1 tmp2 | grep -q "^R-AXIS" && DET=raxis
-grep -q "^SOURCE_WAVELENGTH=1" tmp2 && DET=dtrek
+grep -q "^SOURCE_WAVELENGTH= *1" tmp2 && DET=dtrek
 grep -q mar345 tmp2		 && DET=MAR345                         
 
 # identify other detector types in the same way 
@@ -387,14 +388,22 @@ elif [ "$DET" == "dtrek" ]; then
   if [ "$dname" == "CCD_" ]; then
     DETECTOR="SATURN MINIMUM_VALID_PIXEL_VALUE=1"
     dtrek_det="saturn"
+
+    # Find rotation axis. Warning: currently not support flipping (det(tmpmat)<0)
+    # I'm not sure this method is really valid - but at least mosflm seems to read this to determine rotation axis.
+    tmpmat=(`grep ${dname}SPATIAL_DISTORTION_VECTORS= tmp2 | tail -1 | sed -e "s/.*=//"`)
+    rotx=`echo "scale=6; -1.0*${tmpmat[0]}" | bc -l`
+    roty=`echo "scale=6; -1.0*${tmpmat[1]}" | bc -l`
+    dtrek_rotation_axis="$rotx $roty 0"
+   if [ `echo "(${tmpmat[0]}*${tmpmat[3]}-(${tmpmat[1]}*${tmpmat[2]}))/1"|bc` -lt 0 ]; then
+    echo ""
+    echo "WARNING!! not-supported SPATIAL_DISTORTION_VECTORS header detected."
+    echo "Please report this to XDSwiki author."
+    echo ""
+   fi
   else # should be RX_
     DETECTOR="RAXIS MINIMUM_VALID_PIXEL_VALUE=0"
     dtrek_det="raxis"
-  fi
-
-  # Saturn on SPring-8 BL26B1
-  if grep "CCD_DETECTOR_IDENTIFICATION=MSC_REIT_A200_SN09250183" tmp2 > /dev/null; then
-   REVERSE_PHI="yes"
   fi
 
   # find OVERLOAD
@@ -419,9 +428,9 @@ elif [ "$DET" == "dtrek" ]; then
   ORGY=${SPATIAL_DISTORTION_INFO[1]}
 
   # find DETECTOR_DISTANCE 
-  GONIO_NAMES=(`grep ${dname}GONIO_NAMES tmp2 | tail -1 | sed s/.*_GONIO_NAMES=//`)
-  GONIO_VALUES=(`grep ${dname}GONIO_VALUES tmp2 | tail -1 | sed s/.*_GONIO_VALUES=//`)
-  GONIO_UNITS=(`grep ${dname}GONIO_UNITS tmp2 | tail -1 | sed s/.*_GONIO_UNITS=//`)
+  GONIO_NAMES=(`grep ${dname}GONIO_NAMES= tmp2 | tail -1 | sed s/.*_GONIO_NAMES=//`)
+  GONIO_VALUES=(`grep ${dname}GONIO_VALUES= tmp2 | tail -1 | sed s/.*_GONIO_VALUES=//`)
+  GONIO_UNITS=(`grep ${dname}GONIO_UNITS= tmp2 | tail -1 | sed s/.*_GONIO_UNITS=//`)
   for i in `seq 1 ${#GONIO_NAMES[*]}`
   do
    idx=$((i-1))
@@ -434,8 +443,6 @@ elif [ "$DET" == "dtrek" ]; then
   # find OSCILLATION_RANGE
   ROTATION=(`grep "^ROTATION=" tmp2 | tail -1 | sed s/ROTATION=//`)
   OSCILLATION_RANGE=${ROTATION[2]}
-
-  # NOTE: how can we know correct ROTATION_AXIS=?
 
 elif [ "$DET" == "MAR345" ]; then
   
@@ -535,7 +542,9 @@ ROTATION_AXIS=0 1 0
 POLARIZATION_PLANE_NORMAL=1 0 0
 eof
 else
- if [ "$REVERSE_PHI" == "no" ]; then
+ if [ "$dtrek_rotation_axis" != "" ]; then
+  echo "ROTATION_AXIS= $dtrek_rotation_axis" >> XDS.INP
+ elif [ "$REVERSE_PHI" == "no" ]; then
   echo 'ROTATION_AXIS=1 0 0  ! Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8, SSRF BL17U need -1 0 0. Diamond ID24 needs 0 -1 0' >> XDS.INP
  else
   echo 'ROTATION_AXIS=-1 0 0  ! if this is wrong, please contact author.' >> XDS.INP
