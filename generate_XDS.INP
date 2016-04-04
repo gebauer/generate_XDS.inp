@@ -61,7 +61,8 @@
 # revision 0.57 . KD 12/2015 start to take care of vertical ROTATION_AXIS at Diamond I24 - for now only introduce comment
 # revision 0.58 . Keitaro 01/2016 fix for dTREK image: take 'rotation axis' information from header
 # revision 0.59 . KD 04/04/2016 check for ADSC detector _after_ checking for dtrek detector, to correct wrong choice for https://zenodo.org/record/45756
-REVISION="0.59 (04-Apr-2016)"
+# revision 0.60 . KD 04/04/2016 ADSC detector SN=458 at APS 19-ID has reverse phi (https://zenodo.org/record/45756)
+REVISION="0.60 (04-Apr-2016)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
