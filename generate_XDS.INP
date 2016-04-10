@@ -62,7 +62,8 @@
 # revision 0.58 . Keitaro 01/2016 fix for dTREK image: take 'rotation axis' information from header
 # revision 0.59 . KD 04/04/2016 check for ADSC detector _after_ checking for dtrek detector, to correct wrong choice for https://zenodo.org/record/45756
 # revision 0.60 . KD 04/04/2016 ADSC detector SN=458 at APS 19-ID has reverse phi (https://zenodo.org/record/45756)
-REVISION="0.60 (04-Apr-2016)"
+# revision 0.61 . Keitaro 10/04/2016 Add Eiger hdf5 support (may be incomplete; UNTRUSTED_RECTANGLE=s not set) NEED h5dump.
+REVISION="0.61 (10-Apr-2016)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -131,29 +132,41 @@ data_half=`echo "if ($data_half<=1) 1;if ($data_half>1) $data_half" | bc -l`
 spot_last=`echo "scale=0; $data_first+$data_half-1" | bc -l`
 SPOT_RANGE="$data_first $spot_last"
 
+FIRSTFRAME=`head -1 tmp1`
+echo $FIRSTFRAME | grep "\.h5$" && is_h5=1 || is_h5=0
+
+if [ "$is_h5" == 1 ]; then
+ nframes=`h5dump -A -g "/entry/data" $FIRSTFRAME | grep "DATASPACE  SIMPLE" | sed -e "s/,.*//" | awk '{a+=$5}END{print a}'`
+ DATA_RANGE="1 $nframes"
+ SPOT_RANGE="1 `echo "scale=0; ${nframes}/2"|bc -l`"
+fi
+
 echo DATA_RANGE=$DATA_RANGE
 
 # find out detector type
 DET=XXX              
 IFS=$'\n'    
-FIRSTFRAME=`head -1 tmp1`
 echo $FIRSTFRAME | grep -q '\.bz2$' && bzcat $FIRSTFRAME > tmp1 && FIRSTFRAME=tmp1
 # for mac/linux compatibility. zcat foo.gz doesn't work on mac.
 echo $FIRSTFRAME | grep -q '\.gz$' && zcat < $FIRSTFRAME > tmp1 && FIRSTFRAME=tmp1
 echo $FIRSTFRAME | grep -q '\.xz$' && xzcat $FIRSTFRAME > tmp1 && FIRSTFRAME=tmp1
 
-strings $FIRSTFRAME > tmp2   
 unset IFS
-# TODO: whenever FIRSTFRAME is used below, it should be copied to tmp2 (using IFS as above), and tmp2 should be used instead
-# this was done for "mccd", but still has to be done for the "raxis" detector types
-# the reason is that FIRSTFRAME may contain a blank, which makes some commands fail                                                
-egrep -qi 'marccd|Corrected' tmp2 && DET=mccd                                 
-grep -q PILATUS tmp2             && DET=pilatus                              
-head -n1 tmp2 | grep -q "^RAXIS" && DET=raxis
-head -n1 tmp2 | grep -q "^R-AXIS" && DET=raxis
-grep -q "^SOURCE_WAVELENGTH= *1" tmp2 && DET=dtrek
-grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
-grep -q mar345 tmp2		 && DET=MAR345                         
+if [ "$is_h5" == 0 ]; then
+ strings $FIRSTFRAME > tmp2   
+ # TODO: whenever FIRSTFRAME is used below, it should be copied to tmp2 (using IFS as above), and tmp2 should be used instead
+ # this was done for "mccd", but still has to be done for the "raxis" detector types
+ # the reason is that FIRSTFRAME may contain a blank, which makes some commands fail                                                
+ egrep -qi 'marccd|Corrected' tmp2 && DET=mccd                                 
+ grep -q PILATUS tmp2             && DET=pilatus                              
+ head -n1 tmp2 | grep -q "^RAXIS" && DET=raxis
+ head -n1 tmp2 | grep -q "^R-AXIS" && DET=raxis
+ grep -q "^SOURCE_WAVELENGTH= *1" tmp2 && DET=dtrek
+ grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
+ grep -q mar345 tmp2		 && DET=MAR345                         
+else
+ h5dump -d "/entry/instrument/detector/description" $FIRSTFRAME | grep -i Eiger > /dev/null && DET=eiger
+fi
 
 # identify other detector types in the same way 
 
@@ -359,6 +372,30 @@ PILATUS3 6M, S/N 60-0125
         REVERSE_PHI="yes"
       fi
 
+elif [ "$DET" == "eiger" ]; then
+  OVERLOAD=`h5dump -d "/entry/instrument/detector/detectorSpecific/countrate_correction_count_cutoff" $FIRSTFRAME | awk '/\(0\):/{print $2}' `
+  DETECTOR="EIGER MINIMUM_VALID_PIXEL_VALUE=0 OVERLOAD= $OVERLOAD  !EIGER"
+  QX=`h5dump -d "/entry/instrument/detector/x_pixel_size" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
+  QY=`h5dump -d "/entry/instrument/detector/y_pixel_size" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
+
+  echo Data from a Eiger hdf5
+      SENSOR_THICKNESS=`h5dump -d "/entry/instrument/detector/sensor_thickness" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
+      X_RAY_WAVELENGTH=`h5dump -d "/entry/instrument/beam/incident_wavelength" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
+
+      NX=`h5dump -d "/entry/instrument/detector/detectorSpecific/x_pixels_in_detector" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
+      NY=`h5dump -d "/entry/instrument/detector/detectorSpecific/y_pixels_in_detector" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
+
+      # find ORGX and ORGY:
+      ORGX=`h5dump -d "/entry/instrument/detector/beam_center_x" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
+      ORGY=`h5dump -d "/entry/instrument/detector/beam_center_y" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
+
+      # find DETECTOR_DISTANCE and OSCILLATION_RANGE:
+      DETECTOR_DISTANCE=`h5dump -d "/entry/instrument/detector/detector_distance" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
+      OSCILLATION_RANGE=`h5dump -d "/entry/sample/goniometer/omega_range_average" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
+
+      # If rotation vector set (NeXus)
+      rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME | grep "(0):" | sed -e "s/^.*://; s/,//g"`
+  
 elif [ "$DET" == "raxis" ]; then
   echo Data from a RAXIS detector
 
@@ -397,7 +434,7 @@ elif [ "$DET" == "dtrek" ]; then
     tmpmat=(`grep ${dname}SPATIAL_DISTORTION_VECTORS= tmp2 | tail -1 | sed -e "s/.*=//"`)
     rotx=`echo "scale=6; -1.0*${tmpmat[0]}" | bc -l`
     roty=`echo "scale=6; -1.0*${tmpmat[1]}" | bc -l`
-    dtrek_rotation_axis="$rotx $roty 0"
+    rotation_axis="$rotx $roty 0"
    if [ `echo "(${tmpmat[0]}*${tmpmat[3]}-(${tmpmat[1]}*${tmpmat[2]}))/1"|bc` -lt 0 ]; then
     echo ""
     echo "WARNING!! not-supported SPATIAL_DISTORTION_VECTORS header detected."
@@ -545,8 +582,8 @@ ROTATION_AXIS=0 1 0
 POLARIZATION_PLANE_NORMAL=1 0 0
 eof
 else
- if [ "$dtrek_rotation_axis" != "" ]; then
-  echo "ROTATION_AXIS= $dtrek_rotation_axis" >> XDS.INP
+ if [ "$rotation_axis" != "" ]; then
+  echo "ROTATION_AXIS= $rotation_axis" >> XDS.INP
  elif [ "$REVERSE_PHI" == "no" ]; then
   echo 'ROTATION_AXIS=1 0 0  ! Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8, SSRF BL17U need -1 0 0. Diamond ID24 needs 0 -1 0' >> XDS.INP
  else
@@ -582,7 +619,7 @@ cat >> XDS.INP << eof
 !EXCLUDE_RESOLUTION_RANGE= 1.913 1.853 !ice-ring at 1.883 Angstrom - weak
 !EXCLUDE_RESOLUTION_RANGE= 1.751 1.691 !ice-ring at 1.721 Angstrom - weak
 eof
-if [ "$DET" == "pilatus" ]; then
+if [ "$DET" == "pilatus" -o "$DET" == "eiger" ]; then
 cat >> XDS.INP << eof
 SEPMIN=4 CLUSTER_RADIUS=2
 NUMBER_OF_PROFILE_GRID_POINTS_ALONG_ALPHA/BETA=13 ! Default is 9 - Increasing may improve data 
