@@ -63,7 +63,8 @@
 # revision 0.59 . KD 04/04/2016 check for ADSC detector _after_ checking for dtrek detector, to correct wrong choice for https://zenodo.org/record/45756
 # revision 0.60 . KD 04/04/2016 ADSC detector SN=458 at APS 19-ID has reverse phi (https://zenodo.org/record/45756)
 # revision 0.61 . Keitaro 10/04/2016 Add Eiger hdf5 support (may be incomplete; UNTRUSTED_RECTANGLE=s not set) NEED h5dump.
-REVISION="0.61 (10-Apr-2016)"
+# revision 0.62 . Keitaro 11/04/2016 Can give foo_master.h5 instead of foo_??????.h5.
+REVISION="0.62 (11-Apr-2016)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -118,19 +119,23 @@ fi
 unset IFS
 # we can continue - the frames are found
 
-# Find the first '?' position and the number of '?' to determine DATA_RANGE=.
-pos1=`echo "$1" | awk '{print index($0, "?")}'`
-pos2=`echo "$1" | sed -e "s/[^\?]//g" | awk '{print length+'$pos1' - 1'}`
-data_first=`cat tmp1 | cut -b $pos1-$pos2 | head -n1|bc`
-data_last=`cat tmp1 | cut -b $pos1-$pos2 | tail -n1|bc`
-DATA_RANGE="$data_first $data_last"
-
-# set SPOT_RANGE to first half of DATA_RANGE
-data_num=`wc -l tmp1 | awk '{print $1}'`
-data_half=`echo "scale=0; $data_num/2" | bc -l`                        
-data_half=`echo "if ($data_half<=1) 1;if ($data_half>1) $data_half" | bc -l`
-spot_last=`echo "scale=0; $data_first+$data_half-1" | bc -l`
-SPOT_RANGE="$data_first $spot_last"
+if echo $NAME_TEMPLATE_OF_DATA_FRAMES | grep '_master.h5$' > /dev/null; then
+ NAME_TEMPLATE_OF_DATA_FRAMES=`echo "$NAME_TEMPLATE_OF_DATA_FRAMES" | sed -e 's/_master.h5$/_??????.h5/'`
+else
+ # Find the first '?' position and the number of '?' to determine DATA_RANGE=.
+ pos1=`echo "$1" | awk '{print index($0, "?")}'`
+ pos2=`echo "$1" | sed -e "s/[^\?]//g" | awk '{print length+'$pos1' - 1'}`
+ data_first=`cat tmp1 | cut -b $pos1-$pos2 | head -n1|bc`
+ data_last=`cat tmp1 | cut -b $pos1-$pos2 | tail -n1|bc`
+ DATA_RANGE="$data_first $data_last"
+ 
+ # set SPOT_RANGE to first half of DATA_RANGE
+ data_num=`wc -l tmp1 | awk '{print $1}'`
+ data_half=`echo "scale=0; $data_num/2" | bc -l`                        
+ data_half=`echo "if ($data_half<=1) 1;if ($data_half>1) $data_half" | bc -l`
+ spot_last=`echo "scale=0; $data_first+$data_half-1" | bc -l`
+ SPOT_RANGE="$data_first $spot_last"
+fi
 
 FIRSTFRAME=`head -1 tmp1`
 echo $FIRSTFRAME | grep "\.h5$" && is_h5=1 || is_h5=0
