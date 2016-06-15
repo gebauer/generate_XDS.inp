@@ -64,7 +64,9 @@
 # revision 0.60 . KD 04/04/2016 ADSC detector SN=458 at APS 19-ID has reverse phi (https://zenodo.org/record/45756)
 # revision 0.61 . Keitaro 10/04/2016 Add Eiger hdf5 support (may be incomplete; UNTRUSTED_RECTANGLE=s not set) NEED h5dump.
 # revision 0.62 . Keitaro 11/04/2016 Can give foo_master.h5 instead of foo_??????.h5.
-REVISION="0.62 (11-Apr-2016)"
+# revision 0.63 . Keitaro 13/04/2016 Set UNTRUSTED_RECTANGLE=s for EIGER 9M and 16M (KD).
+# revision 0.64 . KD 16/06/2016 reverse phi @APS 19ID (reported by Wolfram Tempel)
+REVISION="0.63 (13-Apr-2016)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -369,9 +371,11 @@ elif [ "$DET" == "pilatus" ]; then
 
       # get detector serial number and check if it is included in the list
       # Known detectors for reversed-phi in SPring-8: BL41XU PILATUS3 6M 60-0125
+      # Known detectors for reversed-phi in APS: 19ID PILATUS3 6M 60-0132
       DET_SN=`grep "Detector:" tmp2 | sed "s/^.*Detector: *//"`
       REVERSEPHI_SNs="
 PILATUS3 6M, S/N 60-0125
+PILATUS3 6M, S/N 60-0132
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
         REVERSE_PHI="yes"
@@ -683,6 +687,35 @@ UNTRUSTED_RECTANGLE=   0 2464  1679 1697
 UNTRUSTED_RECTANGLE=   0 2464  1891 1909
 UNTRUSTED_RECTANGLE=   0 2464  2103 2121
 UNTRUSTED_RECTANGLE=   0 2464  2315 2333
+eof
+  elif [ $NX == "3110"  -a $NY == "3269" ]; then
+# Eiger 9M
+    cat >> XDS.INP << eof
+!EXCLUSION OF VERTICAL DEAD AREAS OF THE EIGER 9M DETECTOR
+UNTRUSTED_RECTANGLE= 1029 1042 0 3269
+UNTRUSTED_RECTANGLE= 2069 2082 0 3269
+!EXCLUSION OF HORIZONTAL DEAD AREAS OF THE EIGER 9M DETECTOR
+UNTRUSTED_RECTANGLE= 0 3110  513  553
+UNTRUSTED_RECTANGLE= 0 3110 1064 1104
+UNTRUSTED_RECTANGLE= 0 3110 1615 1655
+UNTRUSTED_RECTANGLE= 0 3110 2166 2206
+UNTRUSTED_RECTANGLE= 0 3110 2717 2757
+eof
+  elif [ $NX == "4150"  -a $NY == "4371" ]; then
+# Eiger 16M
+    cat >> XDS.INP << eof
+!EXCLUSION OF HORIZONTAL DEAD AREAS OF THE EIGER 16M DETECTOR + ONE PIXEL ON EACH SIDE
+ UNTRUSTED_RECTANGLE=    0 4150    513  553
+ UNTRUSTED_RECTANGLE=    0 4150   1064 1104
+ UNTRUSTED_RECTANGLE=    0 4150   1615 1655
+ UNTRUSTED_RECTANGLE=    0 4150   2166 2206
+ UNTRUSTED_RECTANGLE=    0 4150   2717 2757
+ UNTRUSTED_RECTANGLE=    0 4150   3268 3308
+ UNTRUSTED_RECTANGLE=    0 4150   3819 3859
+!EXCLUSION OF VERTICAL DEAD AREAS OF THE EIGER 16M DETECTOR + ONE PIXEL ON EACH SIDE
+ UNTRUSTED_RECTANGLE= 1029 1042      0 4371
+ UNTRUSTED_RECTANGLE= 2069 2082      0 4371 
+ UNTRUSTED_RECTANGLE= 3109 3122      0 4371
 eof
   fi
 fi
