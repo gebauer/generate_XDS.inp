@@ -66,7 +66,7 @@
 # revision 0.62 . Keitaro 11/04/2016 Can give foo_master.h5 instead of foo_??????.h5.
 # revision 0.63 . Keitaro 13/04/2016 Set UNTRUSTED_RECTANGLE=s for EIGER 9M and 16M (KD).
 # revision 0.64 . KD 16/06/2016 reverse phi @APS 19ID (reported by Wolfram Tempel)
-REVISION="0.63 (13-Apr-2016)"
+REVISION="0.64 (16-Jun-2016)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -566,9 +566,9 @@ STRONG_PIXEL=4           ! COLSPOT: only use strong reflections (default is 3)
 MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=3 ! default of 6 is sometimes too high
 ! close spots/long cell axis: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 6 and 3
 ! SEPMIN=4  CLUSTER_RADIUS=2 ! should be default for Pilatus and other detectors with low PSF
-! since XDS 01-MAR-2015, POSITION is used instead of DISTANCE. Older versions do it the other way round.
+! since XDS 01-MAR-2015, POSITION supersedes DISTANCE. DISTANCE only for compatibility w/ old XDS.
 ! nowadays headers are usually correct so refine DISTANCE/POSITION in INTEGRATE but not IDXREF
-REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS ! DISTANCE POSITION
+REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS ! POSITION
 REFINE(INTEGRATE)= DISTANCE POSITION BEAM ORIENTATION ! AXIS CELL
 ! REFINE(CORRECT)=CELL BEAM ORIENTATION AXIS DISTANCE POSITION ! Default is: refine everything
 
