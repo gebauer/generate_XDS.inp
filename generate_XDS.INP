@@ -66,7 +66,8 @@
 # revision 0.62 . Keitaro 11/04/2016 Can give foo_master.h5 instead of foo_??????.h5.
 # revision 0.63 . Keitaro 13/04/2016 Set UNTRUSTED_RECTANGLE=s for EIGER 9M and 16M (KD).
 # revision 0.64 . KD 16/06/2016 reverse phi @APS 19ID (reported by Wolfram Tempel)
-REVISION="0.64 (16-Jun-2016)"
+# revision 0.65 . Keitaro 07/09/2016 Fix for "too many arguments" problem in ls
+REVISION="0.65 (07-Sep-2016)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -105,13 +106,17 @@ NX=XXX
 NY=XXX                                                                                                           
 SENSOR_THICKNESS=0   
 TRUSTED_REGION="0.0 1.2 ! partially use corners of detector (0 1.4143: use all pixels)"                                                                                           
+
+dname=`echo "$1" | xargs dirname`
+test "${dname}" == "" && dname="."
+bname=`echo "$1" | xargs basename`
 # see how we are called:                                                                                         
-NAME_TEMPLATE_OF_DATA_FRAMES="$1"
+NAME_TEMPLATE_OF_DATA_FRAMES="${dname}/${bname}"
 # list frames matching the wildcards in NAME_TEMPLATE_OF_DATA_FRAMES
 # don't accept the "direct beam" shot at SLS/Pilatus PX-I and PX-II 
 # cope with blanks in directory / file name
 IFS=$'\n'
-/bin/ls -C1 $1 $1.bz2 $1.gz $1.xz 2>/dev/null | egrep -v "_00000.cbf|_000.img" > tmp1
+find $dname -name "$bname" -or -name "${bname}.bz2" -or -name "${bname}.gz" -or -name "${bname}.xz" | egrep -v "_00000.cbf|_000.img" | sort > tmp1
 if [ ! -s tmp1 ]
 then
  echo "Error! No files matched: $1"
@@ -125,8 +130,8 @@ if echo $NAME_TEMPLATE_OF_DATA_FRAMES | grep '_master.h5$' > /dev/null; then
  NAME_TEMPLATE_OF_DATA_FRAMES=`echo "$NAME_TEMPLATE_OF_DATA_FRAMES" | sed -e 's/_master.h5$/_??????.h5/'`
 else
  # Find the first '?' position and the number of '?' to determine DATA_RANGE=.
- pos1=`echo "$1" | awk '{print index($0, "?")}'`
- pos2=`echo "$1" | sed -e "s/[^\?]//g" | awk '{print length+'$pos1' - 1'}`
+ pos1=`echo "$NAME_TEMPLATE_OF_DATA_FRAMES" | awk '{print index($0, "?")}'`
+ pos2=`echo "$NAME_TEMPLATE_OF_DATA_FRAMES" | sed -e "s/[^\?]//g" | awk '{print length+'$pos1' - 1'}`
  data_first=`cat tmp1 | cut -b $pos1-$pos2 | head -n1|bc`
  data_last=`cat tmp1 | cut -b $pos1-$pos2 | tail -n1|bc`
  DATA_RANGE="$data_first $data_last"
