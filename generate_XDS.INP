@@ -69,7 +69,8 @@
 # revision 0.65 . Keitaro 07/09/2016 Fix for "too many arguments" problem in ls
 # revision 0.66 . KD 15/09/2016 add Bruker PHOTON II with .cbf frames
 # revision 0.67 . KD 02/10/2016 add BM30A (ADSC SERIAL 924) reverse_phi
-REVISION="0.67 (02-Oct-2016)"
+# revision 0.68 . KD 24/10/2016 add -H option (follow symlinks) to "find" command (thanks to Jan Gebauer!)
+REVISION="0.68 (24-Oct-2016)"
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -124,7 +125,7 @@ NAME_TEMPLATE_OF_DATA_FRAMES="${dname}/${bname}"
 # don't accept the "direct beam" shot at SLS/Pilatus PX-I and PX-II 
 # cope with blanks in directory / file name
 IFS=$'\n'
-find $dname -name "$bname" -or -name "${bname}.bz2" -or -name "${bname}.gz" -or -name "${bname}.xz" | egrep -v "_00000.cbf|_000.img" | sort > tmp1
+find -H $dname -name "$bname" -or -name "${bname}.bz2" -or -name "${bname}.gz" -or -name "${bname}.xz" | egrep -v "_00000.cbf|_000.img" | sort > tmp1
 if [ ! -s tmp1 ]
 then
  echo "Error! No files matched: $1"
