@@ -70,7 +70,9 @@
 # revision 0.66 . KD 15/09/2016 add Bruker PHOTON II with .cbf frames
 # revision 0.67 . KD 02/10/2016 add BM30A (ADSC SERIAL 924) reverse_phi
 # revision 0.68 . KD 24/10/2016 add -H option (follow symlinks) to "find" command (thanks to Jan Gebauer!)
-REVISION="0.68 (24-Oct-2016)"
+# revision 0.69 . KD 04/11/2016 add CMOS-1 MBC Detector at ALS 4.2.2
+REVISION="0.69 (04-Nov-2016)"
+
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
 # make sure to have the two quotation marks !                                                                
@@ -185,7 +187,8 @@ if [ "$is_h5" == 0 ]; then
  grep -q "^SOURCE_WAVELENGTH= *1" tmp2 && DET=dtrek
  grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
  grep -q mar345 tmp2		 && DET=MAR345     
- grep -q BRUKER tmp2 && grep -q CBF tmp2  && DET=Bruker-cbf                    
+ grep -q BRUKER tmp2 && grep -q CBF tmp2  && DET=Bruker-cbf   
+ grep -q CMOS1 tmp2 && DET=adsc-CMOS1                   
 else
  h5dump -d "/entry/instrument/detector/description" $FIRSTFRAME | grep -i Eiger > /dev/null && DET=eiger
 fi
@@ -282,9 +285,8 @@ elif [ "$DET" == "adsc" ]; then
 
       # find NX, QX, ORGX and ORGY:
       NX=`grep SIZE1 tmp2 | tail -1 | sed s/SIZE1=//`
+      NY=`grep SIZE2 tmp2 | tail -1 | sed s/SIZE2=//`                                             
       QX=`grep PIXEL_SIZE tmp2 | sed s/PIXEL_SIZE=//`
-# FIXME - next 2 lines should be done properly, from header
-      NY=$NX                                               
       QY=$QX                                               
       BEAM_CENTER_X=`grep BEAM_CENTER_X tmp2 | sed s/BEAM_CENTER_X=//`
       BEAM_CENTER_Y=`grep BEAM_CENTER_Y tmp2 | sed s/BEAM_CENTER_Y=//`
@@ -357,7 +359,25 @@ elif [ "$DET" == "adsc" ]; then
 
       # find DETECTOR_DISTANCE and OSCILLATION_RANGE:                                                                                
       DETECTOR_DISTANCE=`grep ^DISTANCE tmp2 | sed s/DISTANCE=//`                                                                     
-      OSCILLATION_RANGE=`grep OSC_RANGE tmp2 | sed s/OSC_RANGE=//`                                                                   
+      OSCILLATION_RANGE=`grep OSC_RANGE tmp2 | sed s/OSC_RANGE=//`       
+                                                            
+elif [ "$DET" == "adsc-CMOS1" ]; then
+  DETECTOR="ADSC MINIMUM_VALID_PIXEL_VALUE= 1 OVERLOAD= 65000"
+  echo Data from CMOS1 MBC detector.
+  SENSOR_THICKNESS=0.01                                                        
+  sed s/\;// tmp2 > tmp1                                                       
+  mv tmp1 tmp2                                                                 
+  X_RAY_WAVELENGTH=`grep WAVELENGTH tmp2 | head -1 | sed s/WAVELENGTH=//`
+  NX=`grep SIZE1 tmp2 | tail -1 | sed s/SIZE1=//`
+  QX=`grep PIXEL_SIZE tmp2 | sed s/PIXEL_SIZE=//`
+  NY=`grep SIZE2 tmp2 | tail -1 | sed s/SIZE2=//`                                             
+  QY=$QX                                               
+  ORGX=`grep BEAM_CENTER_X tmp2 | sed s/BEAM_CENTER_X=//`
+  ORGY=`grep BEAM_CENTER_Y tmp2 | sed s/BEAM_CENTER_Y=//`
+  REVERSE_PHI="yes"
+  DETECTOR_DISTANCE=`grep ^DISTANCE tmp2 | sed s/DISTANCE=/-/`                                                                     
+  OSCILLATION_RANGE=`grep OMEGA_DELTA tmp2 | sed s/OMEGA_DELTA=//`  
+  DIRECTION_OF_DETECTOR_X_AXIS="-1 0 0"                                                                 
 
 elif [ "$DET" == "pilatus" ]; then
   DETECTOR="PILATUS MINIMUM_VALID_PIXEL_VALUE=0 OVERLOAD= 1048576  !PILATUS"
@@ -704,6 +724,8 @@ cat >> XDS.INP << eof
 eof
 if [ "$DET" == "Bruker-cbf" ]; then
   echo "DELPHI=15 ! refine less often than the default of 5" >> XDS.INP
+elif [ "$DET" == "adsc-CMOS1" ]; then
+  echo UNTRUSTED_RECTANGLE= 0 1468  2451 2631  >> XDS.INP
 elif [ "$DET" == "pilatus" -o "$DET" == "eiger" ]; then
 cat >> XDS.INP << eof
 SEPMIN=4 CLUSTER_RADIUS=2
