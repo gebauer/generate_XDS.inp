@@ -72,7 +72,8 @@
 # revision 0.68 . KD 24/10/2016 add -H option (follow symlinks) to "find" command (thanks to Jan Gebauer!)
 # revision 0.69 . KD 04/11/2016 add CMOS-1 MBC Detector at ALS 4.2.2
 # revision 0.70beta . KD 08/12/2016 ROTATION_AXIS=0 -1 0 at Diamond I24; depending on CBF header
-REVISION="0.70beta (08-Dec-2016)"
+# revision 0.70 . KD 12/01/2017 remove error message if h5dump does not find /entry/sample/transformations/omega/vector
+REVISION="0.70 (12-Jan-2017)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -447,7 +448,7 @@ elif [ "$DET" == "eiger" ]; then
       OSCILLATION_RANGE=`h5dump -d "/entry/sample/goniometer/omega_range_average" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
 
       # If rotation vector set (NeXus)
-      rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME | grep "(0):" | sed -e "s/^.*://; s/,//g"`
+      rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME 2>/dev/null | grep "(0):" | sed -e "s/^.*://; s/,//g"`
   
 elif [ "$DET" == "raxis" ]; then
   echo Data from a RAXIS detector
