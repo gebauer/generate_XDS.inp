@@ -73,7 +73,8 @@
 # revision 0.69 . KD 04/11/2016 add CMOS-1 MBC Detector at ALS 4.2.2
 # revision 0.70beta . KD 08/12/2016 ROTATION_AXIS=0 -1 0 at Diamond I24; depending on CBF header
 # revision 0.70 . KD 12/01/2017 remove error message if h5dump does not find /entry/sample/transformations/omega/vector
-REVISION="0.70 (12-Jan-2017)"
+# revision 0.71 . KD 27/02/2017 implement rule for S/N 916 @ APS 24_ID_E
+REVISION="0.71 (27-Feb-2017)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -323,7 +324,7 @@ elif [ "$DET" == "adsc" ]; then
 
       # Decision of beam center convention based on detector serial numbers.
       DET_SN=`grep DETECTOR_SN tmp2 | sed -e "s/DETECTOR_SN=//"`
-      # For convention 1; Known PF detectors = 449: NW12A Q210, 472: NE3A Q270, 474: BL17A Q270, 912: BL5A Q315, 923: ALS BL5.0.2 Q315, 933: AichiSR BL2S1 Q315
+      # For convention 1; Known PF detectors = 449: NW12A Q210, 472: NE3A Q270, 474: BL17A Q270, 912: BL5A Q315, 923: ALS BL5.0.2 Q315, 933: AichiSR BL2S1 Q315, 916: APS 24 IDE
       ORG1_SNs="
 449
 472
@@ -333,6 +334,7 @@ elif [ "$DET" == "adsc" ]; then
 933
 911
 446
+916
 "
       ORG4_SNs="
 915
