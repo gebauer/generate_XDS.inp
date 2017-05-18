@@ -76,7 +76,7 @@
 # revision 0.71 . KD 27/02/2017 implement rule for S/N 916 @ APS 24_ID_E
 # revision 0.72 . KD 8/03/2017 fix nframes lookup in Eiger master file
 # revision 0.73 . KD 18/05/2017 for Andrey Nascimento: add Pilatus 2M S/N 24-0109 with ROTATION_AXIS=-1 0 0
-REVISION="0.72 (8-Mar-2017)"
+REVISION="0.73 (18-May-2017)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
