@@ -74,7 +74,9 @@
 # revision 0.70beta . KD 08/12/2016 ROTATION_AXIS=0 -1 0 at Diamond I24; depending on CBF header
 # revision 0.70 . KD 12/01/2017 remove error message if h5dump does not find /entry/sample/transformations/omega/vector
 # revision 0.71 . KD 27/02/2017 implement rule for S/N 916 @ APS 24_ID_E
-REVISION="0.71 (27-Feb-2017)"
+# revision 0.72 . KD 8/03/2017 fix nframes lookup in Eiger master file
+# revision 0.73 . KD 18/05/2017 for Andrey Nascimento: add Pilatus 2M S/N 24-0109 with ROTATION_AXIS=-1 0 0
+REVISION="0.72 (8-Mar-2017)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -162,7 +164,8 @@ FIRSTFRAME=`head -1 tmp1`
 echo $FIRSTFRAME | grep "\.h5$" && is_h5=1 || is_h5=0
 
 if [ "$is_h5" == 1 ]; then
- nframes=`h5dump -A -g "/entry/data" $FIRSTFRAME | grep "DATASPACE  SIMPLE" | sed -e "s/,.*//" | awk '{a+=$5}END{print a}'`
+# nframes=`h5dump -A -g "/entry/data" $FIRSTFRAME | grep "DATASPACE  SIMPLE" | sed -e "s/,.*//" | awk '{a+=$5}END{print a}'`
+ nframes=`h5dump -d "/entry/instrument/detector/detectorSpecific/nimages" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
  DATA_RANGE="1 $nframes"
  SPOT_RANGE="1 `echo "scale=0; ${nframes}/2"|bc -l`"
 fi
@@ -412,10 +415,12 @@ elif [ "$DET" == "pilatus" ]; then
       # get detector serial number and check if it is included in the list
       # Known detectors for reversed-phi in SPring-8: BL41XU PILATUS3 6M 60-0125
       # Known detectors for reversed-phi in APS: 19ID PILATUS3 6M 60-0132
+      # Known detectors for reversed-phi at MX2 beamline (Brazilian Synchrotron National Laboratory - LNLS)
       DET_SN=`grep "Detector:" tmp2 | sed "s/^.*Detector: *//"`
       REVERSEPHI_SNs="
 PILATUS3 6M, S/N 60-0125
 PILATUS3 6M, S/N 60-0132
+PILATUS 2M, S/N 24-0109
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
         REVERSE_PHI="yes"
