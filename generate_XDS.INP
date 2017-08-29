@@ -76,7 +76,8 @@
 # revision 0.71 . KD 27/02/2017 implement rule for S/N 916 @ APS 24_ID_E
 # revision 0.72 . KD 8/03/2017 fix nframes lookup in Eiger master file
 # revision 0.73 . KD 18/05/2017 for Andrey Nascimento: add Pilatus 2M S/N 24-0109 with ROTATION_AXIS=-1 0 0
-REVISION="0.73 (18-May-2017)"
+# revision 0.74 . Keitaro 02/08/2017 Add PILATUS3 6M, S/N 60-0127 at CHESS F1 with  ROTATION_AXIS=-1 0 0
+REVISION="0.74 (02-Aug-2017)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -416,11 +417,13 @@ elif [ "$DET" == "pilatus" ]; then
       # Known detectors for reversed-phi in SPring-8: BL41XU PILATUS3 6M 60-0125
       # Known detectors for reversed-phi in APS: 19ID PILATUS3 6M 60-0132
       # Known detectors for reversed-phi at MX2 beamline (Brazilian Synchrotron National Laboratory - LNLS)
+      # Known detectors for reversed-phi at CHESS F1 PILATUS3 6M, S/N 60-0127
       DET_SN=`grep "Detector:" tmp2 | sed "s/^.*Detector: *//"`
       REVERSEPHI_SNs="
 PILATUS3 6M, S/N 60-0125
 PILATUS3 6M, S/N 60-0132
 PILATUS 2M, S/N 24-0109
+PILATUS3 6M, S/N 60-0127
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
         REVERSE_PHI="yes"
@@ -639,7 +642,7 @@ echo X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH
 cat > XDS.INP << eof
 ! written by generate_XDS.INP version $REVISION
 JOB= XYCORR INIT COLSPOT IDXREF DEFPIX INTEGRATE CORRECT
-ORGX= $ORGX ORGY= $ORGY  ! check these values with adxv !\
+ORGX= $ORGX ORGY= $ORGY  ! values from header - check with viewer !
 $COMMENT_ORGXY
 DETECTOR_DISTANCE= $DETECTOR_DISTANCE                    
 OSCILLATION_RANGE= $OSCILLATION_RANGE                    
