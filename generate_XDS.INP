@@ -77,7 +77,8 @@
 # revision 0.72 . KD 8/03/2017 fix nframes lookup in Eiger master file
 # revision 0.73 . KD 18/05/2017 for Andrey Nascimento: add Pilatus 2M S/N 24-0109 with ROTATION_AXIS=-1 0 0
 # revision 0.74 . Keitaro 02/08/2017 Add PILATUS3 6M, S/N 60-0127 at CHESS F1 with  ROTATION_AXIS=-1 0 0
-REVISION="0.74 (02-Aug-2017)"
+# revision 0.75 . KD 30/08/2017 reversed ORGX and ORGY for marCCD @ BM14 (Indian beamline @ ESRF)
+REVISION="0.75 (30-Aug-2017)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -252,6 +253,13 @@ elif [ "$DET" == "mccd" ]; then
   ORGY=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')             
   ORGY=`echo "scale=2; $ORGY/1000" | bc -l `                                                              
 # FIXME 25.5.2015: reverse ORGX and ORGY for BM14 @ ESRF (no serial number in header)
+# fixed Aug 30, 2017 after IUCr2017 @ Hyderabad 
+  if [ "$DET_SN" == "4" ]; then
+     TEMP=$ORGY
+     ORGY=$ORGX
+     ORGX=$TEMP
+     echo reversed ORGX and ORGY for marCCD @ ESRF BM14
+  fi
 
   let SKIP=1024+736
   OSCILLATION_RANGE=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}') 
