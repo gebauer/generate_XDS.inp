@@ -38,7 +38,7 @@
 # revision 0.34 . Keitaro 5/2013 - recognize ADSC detectors in Photon Factory and choose correct beam center convention based on detector serial numbers.
 # revision 0.35 . KD 6/2013 - reduce 7000 to 6000 for shadow detection; insert comment about *_RESOLUTION_RANGE lines
 # revision 0.36 . KD 6/2013 - insert NUMBER_OF_PROFILE_GRID* lines for Pilatus (suggested by C.Vonrhein)
-# revision 0.37 . Keitaro 10/2013 - fix for MX225HS detector on SPring-8 BL32XU (Ignore case when matching marccd in header); but cannot decide reverse-phi because of missing detector S/N
+# revision 0.37 . Keitaro 10/2013 - fix for MX225HS detector on SPring-8 BL32XU (Ignore case when matching marccd in header); see also rev-0.39
 # revision 0.38 . KD 2/2014 - change defaults for REFINE(IDXREF) and REFINE(INTEGRATE) such that more stable results are obtained for difficult datasets
 # revision 0.39 . Keitaro 4/2014 - automatically set ROTATION_AXIS=-1 0 0 for MX225HS at SPring-8 BL32XU.
 # revision 0.40 . Jan Gebauer /KD 4/2014 - simple implementation of MAR345 detector
@@ -60,7 +60,7 @@
 # revision 0.56 . Keitaro 12/2015 show error message when user's input didn't match any files
 # revision 0.57 . KD 12/2015 start to take care of vertical ROTATION_AXIS at Diamond I24 - for now only introduce comment
 # revision 0.58 . Keitaro 01/2016 fix for dTREK image: take 'rotation axis' information from header
-# revision 0.59 . KD 04/04/2016 check for ADSC detector _after_ checking for dtrek detector, to correct wrong choice for https://zenodo.org/record/45756
+# revision 0.59 . KD 04/04/2016 check for ADSC detector _after_ dtrek detector, to correct wrong choice for https://zenodo.org/record/45756
 # revision 0.60 . KD 04/04/2016 ADSC detector SN=458 at APS 19-ID has reverse phi (https://zenodo.org/record/45756)
 # revision 0.61 . Keitaro 10/04/2016 Add Eiger hdf5 support (may be incomplete; UNTRUSTED_RECTANGLE=s not set) NEED h5dump.
 # revision 0.62 . Keitaro 11/04/2016 Can give foo_master.h5 instead of foo_??????.h5.
@@ -78,7 +78,8 @@
 # revision 0.73 . KD 18/05/2017 for Andrey Nascimento: add Pilatus 2M S/N 24-0109 with ROTATION_AXIS=-1 0 0
 # revision 0.74 . Keitaro 02/08/2017 Add PILATUS3 6M, S/N 60-0127 at CHESS F1 with  ROTATION_AXIS=-1 0 0
 # revision 0.75 . KD 30/08/2017 reversed ORGX and ORGY for marCCD @ BM14 (Indian beamline @ ESRF)
-REVISION="0.75 (30-Aug-2017)"
+# revision 0.76 . KD 4/09/2017 include POSITION into REFINE(IDXREF) because latest XDS is more robust. Add comments to keywords.
+REVISION="0.76 (4-Sep-2017)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -641,18 +642,18 @@ else
 fi                           
 
 echo ORGX= $ORGX ORGY= $ORGY - check these values with adxv !
-echo DETECTOR_DISTANCE= $DETECTOR_DISTANCE                   
-echo OSCILLATION_RANGE= $OSCILLATION_RANGE                   
-echo X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH                     
+echo DETECTOR_DISTANCE= $DETECTOR_DISTANCE  ! only read by XYCORR, IDXREF                     
+echo OSCILLATION_RANGE= $OSCILLATION_RANGE  ! only read by IDXREF                 
+echo X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH    ! only read by IDXREF                   
 
 # now we know everything that is required to generate XDS.INP
 
 cat > XDS.INP << eof
 ! written by generate_XDS.INP version $REVISION
 JOB= XYCORR INIT COLSPOT IDXREF DEFPIX INTEGRATE CORRECT
-ORGX= $ORGX ORGY= $ORGY  ! values from header - check with viewer !
+ORGX= $ORGX ORGY= $ORGY  ! values from frame header; only read by XYCORR, IDXREF     
 $COMMENT_ORGXY
-DETECTOR_DISTANCE= $DETECTOR_DISTANCE                    
+DETECTOR_DISTANCE= $DETECTOR_DISTANCE !read by XYCORR, IDXREF. Negative if detector normal points to crystal.               
 OSCILLATION_RANGE= $OSCILLATION_RANGE                    
 X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH                      
 NAME_TEMPLATE_OF_DATA_FRAMES=$NAME_TEMPLATE_OF_DATA_FRAMES
@@ -689,7 +690,7 @@ MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=$MNOPIAS ! default of 6 is sometimes too high
 ! SEPMIN=4  CLUSTER_RADIUS=2 ! should be default for Pilatus and other detectors with low PSF
 ! since XDS 01-MAR-2015, POSITION supersedes DISTANCE. DISTANCE only for compatibility w/ old XDS.
 ! nowadays headers are usually correct so refine DISTANCE/POSITION in INTEGRATE but not IDXREF
-REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS ! POSITION
+REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS POSITION  ! works best with XDS >= BUILT=20170720
 REFINE(INTEGRATE)= DISTANCE POSITION BEAM ORIENTATION ! AXIS CELL
 ! REFINE(CORRECT)=CELL BEAM ORIENTATION AXIS DISTANCE POSITION ! Default is: refine everything
 
@@ -706,14 +707,14 @@ if [ "$DET" == "raxis" -o "$dtrek_det" == "raxis" ]; then
  cat >> XDS.INP << eof
 DIRECTION_OF_DETECTOR_X-AXIS=1 0 0
 DIRECTION_OF_DETECTOR_Y-AXIS=0 -1 0
-INCIDENT_BEAM_DIRECTION=0 0 1
-ROTATION_AXIS=0 1 0
-!FRACTION_OF_POLARIZATION=0.98   ! uncomment if synchrotron
-POLARIZATION_PLANE_NORMAL=1 0 0
+INCIDENT_BEAM_DIRECTION=0 0 1   ! only read by IDXREF
+ROTATION_AXIS=0 1 0             ! only read by IDXREF
+!FRACTION_OF_POLARIZATION=0.98   ! uncomment if synchrotron; only used by CORRECT
+POLARIZATION_PLANE_NORMAL=1 0 0  ! only used by CORRECT
 eof
 else
  if [ "$rotation_axis" != "" ]; then
-  echo "ROTATION_AXIS= $rotation_axis" >> XDS.INP
+  echo "ROTATION_AXIS= $rotation_axis  ! only read by IDXREF" >> XDS.INP
  elif [ "$REVERSE_PHI" == "no" ]; then
   echo 'ROTATION_AXIS=1 0 0  ! Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8, SSRF BL17U need -1 0 0. Diamond ID24 needs 0 -1 0' >> XDS.INP
  else
@@ -731,13 +732,14 @@ DIRECTION_OF_DETECTOR_Y-AXIS=0 1 0
 eof
  fi
  cat >> XDS.INP << eof
-INCIDENT_BEAM_DIRECTION=0 0 1
+INCIDENT_BEAM_DIRECTION=0 0 1          ! only read by IDXREF
 FRACTION_OF_POLARIZATION=${pol_frac}   ! better value is provided by beamline staff!
-POLARIZATION_PLANE_NORMAL=0 1 0
+POLARIZATION_PLANE_NORMAL=0 1 0        ! only used by CORRECT
 eof
 fi
 cat >> XDS.INP << eof
 !used by DEFPIX and CORRECT to exclude ice-reflections / ice rings - uncomment if necessary
+!fine-grained list is in Thorn et al http://journals.iucr.org/d/issues/2017/09/00/hi5647/index.html
 !EXCLUDE_RESOLUTION_RANGE= 3.93 3.87 !ice-ring at 3.897 Angstrom
 !EXCLUDE_RESOLUTION_RANGE= 3.70 3.64 !ice-ring at 3.669 Angstrom
 !EXCLUDE_RESOLUTION_RANGE= 3.47 3.41 !ice-ring at 3.441 Angstrom
