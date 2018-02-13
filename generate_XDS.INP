@@ -81,8 +81,9 @@
 # revision 0.76 . KD 4/09/2017 include POSITION into REFINE(IDXREF) because latest XDS is more robust. Add comments to keywords.
 # revision 0.77 . KD 19/12/2017 obtain QX QY from CBF header.
 # revision 0.78 . KD 21/12/2017 if possible and sensible, provide LIB= line with hardcoded /usr/local/lib64/dectris-neggia.so .
-# revision 0.79 . KD 16/01/2018 read OVERLOAD from Pilatus miniCBF header instead of fixing at 1048576 
-REVISION="0.79 (16-Jan-2018)"
+# revision 0.79 . KD 16/01/2018 read OVERLOAD from Pilatus miniCBF header instead of fixing at 1048576
+# revision 0.80 . KD 13/02/2018 remove DISTANCE keyword from REFINE() list; remove POSITION from REFINE(IDXREF)
+REVISION="0.80 (13-Feb-2018)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -695,11 +696,11 @@ STRONG_PIXEL=4           ! COLSPOT: only use strong reflections (default is 3)
 MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=$MNOPIAS ! default of 6 is sometimes too high
 ! close spots/long cell axis: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 6 and 3
 ! SEPMIN=4  CLUSTER_RADIUS=2 ! should be default for Pilatus and other detectors with low PSF
-! since XDS 01-MAR-2015, POSITION supersedes DISTANCE. DISTANCE only for compatibility w/ old XDS.
-! nowadays headers are usually correct so refine DISTANCE/POSITION in INTEGRATE but not IDXREF
-REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS POSITION  ! works best with XDS >= BUILT=20170720
-REFINE(INTEGRATE)= DISTANCE POSITION BEAM ORIENTATION ! AXIS CELL
-! REFINE(CORRECT)=CELL BEAM ORIENTATION AXIS DISTANCE POSITION ! Default is: refine everything
+! since XDS 01-MAR-2015, POSITION supersedes DISTANCE.
+! nowadays headers are usually correct so refine POSITION in INTEGRATE but not IDXREF
+REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS  ! refine POSITION only if known that header distance inaccurate
+REFINE(INTEGRATE)= POSITION BEAM ORIENTATION ! AXIS CELL
+! REFINE(CORRECT)=CELL BEAM ORIENTATION AXIS POSITION ! Default is: refine everything
 
 ! parameters specifically for this detector and beamline:
 DETECTOR= $DETECTOR
