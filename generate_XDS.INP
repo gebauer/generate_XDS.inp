@@ -83,7 +83,8 @@
 # revision 0.78 . KD 21/12/2017 if possible and sensible, provide LIB= line with hardcoded /usr/local/lib64/dectris-neggia.so .
 # revision 0.79 . KD 16/01/2018 read OVERLOAD from Pilatus miniCBF header instead of fixing at 1048576
 # revision 0.80 . KD 13/02/2018 remove DISTANCE keyword from REFINE() list; remove POSITION from REFINE(IDXREF)
-REVISION="0.80 (13-Feb-2018)"
+# revision 0.81 . KD 21/02/2018 when encountering CBF files from Eiger (ESRF), treat as Pilatus detector
+REVISION="0.81 (21-Feb-2018)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -194,7 +195,8 @@ if [ "$is_h5" == 0 ]; then
  # this was done for "mccd", but still has to be done for the "raxis" detector types
  # the reason is that FIRSTFRAME may contain a blank, which makes some commands fail                                                
  egrep -qi 'marccd|Corrected' tmp2 && DET=mccd                                 
- grep -q PILATUS tmp2             && DET=pilatus                              
+ grep -q PILATUS tmp2             && DET=pilatus 
+ grep -iq Eiger tmp2              && DET=pilatus                             
  head -n1 tmp2 | grep -q "^RAXIS" && DET=raxis
  head -n1 tmp2 | grep -q "^R-AXIS" && DET=raxis
  grep -q "^SOURCE_WAVELENGTH= *1" tmp2 && DET=dtrek
