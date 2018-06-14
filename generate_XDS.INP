@@ -84,7 +84,8 @@
 # revision 0.79 . KD 16/01/2018 read OVERLOAD from Pilatus miniCBF header instead of fixing at 1048576
 # revision 0.80 . KD 13/02/2018 remove DISTANCE keyword from REFINE() list; remove POSITION from REFINE(IDXREF)
 # revision 0.81 . KD 21/02/2018 when encountering CBF files from Eiger (ESRF), treat as Pilatus detector
-REVISION="0.81 (21-Feb-2018)"
+# revision 0.82 . KD 01/03/2018 STARTING_ANGLE for MarCCD/Pilatus/PHOTON, enabling to use dials.rs_mapper with spot2pdb.
+REVISION="0.82 (01-Mar-2018)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -94,7 +95,7 @@ REVISION="0.81 (21-Feb-2018)"
 # known problems:                                                                                            
 # - for ADSC detectors, there are at least three ways to obtain ORGX and ORGY values from the header (see below);
 # - the same might be a problem for MAR headers, too (not sure about this) 
-# - on Mac OS X, Xcode (from http://developer.apple.com/tools/xcode) might be needed - not sure about this                               
+# - on Mac OS X, the Xcode command line tools (from https://developer.apple.com/download/more/) are needed.                            
 #                                                                                                                
 # notes for debugging of the script:                                                                             
 # - add the -v option to the first line, to see where an error occurs                                            
@@ -130,6 +131,7 @@ MNOPIAS=3
 DIRECTION_OF_DETECTOR_X_AXIS="1 0 0"
 # default FRACTION_OF_POLARIZATION
 pol_frac=0.98
+STARTING_ANGLE=0
 
 dname=`echo "$1" | xargs dirname`
 test "${dname}" == "" && dname="."
@@ -252,7 +254,12 @@ elif [ "$DET" == "mccd" ]; then
   let SKIP=1720
   DETECTOR_DISTANCE=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')
   DETECTOR_DISTANCE=`echo "scale=3; $DETECTOR_DISTANCE/1000" | bc -l`                                     
-                                                                                                          
+
+  let SKIP=1024+256+128+256+44
+  STARTING_ANGLE=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}') 
+  STARTING_ANGLE=`echo "scale=2; $STARTING_ANGLE/1000" | bc -l `
+  echo STARTING_ANGLE= $STARTING_ANGLE   
+                                                                                                       
   let SKIP=1024+256+128+256+4                                                                             
   ORGX=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')             
   ORGX=`echo "scale=2; $ORGX/1000" | bc -l `                                                              
@@ -426,11 +433,14 @@ elif [ "$DET" == "pilatus" ]; then
       ORGX=`grep Beam_xy tmp2 | sed -e s/\(// -e s/\)// -e s/\,// | awk '{print $2}'`
       ORGY=`grep Beam_xy tmp2 | sed -e s/\(// -e s/\)// -e s/\,// | awk '{print $3}'`
 
-      # find DETECTOR_DISTANCE and OSCILLATION_RANGE:
-      DETECTOR_DISTANCE=`awk '/distance/{print $2}' tmp2`
+      # find DETECTOR_DISTANCE, OSCILLATION_RANGE, and STARTING_ANGLE:
+      DETECTOR_DISTANCE=`awk '/Detector_distance/{print $2}' tmp2`
       DETECTOR_DISTANCE=`echo "$DETECTOR_DISTANCE*1000" | bc -l`
 
-      OSCILLATION_RANGE=`awk '/Angle/{print $2}' tmp2`
+      OSCILLATION_RANGE=`awk '/Angle_increment/{print $2}' tmp2`
+
+      STARTING_ANGLE=`awk '/Start_angle/{print $2}' tmp2`
+      echo STARTING_ANGLE= $STARTING_ANGLE   
 
       # get detector serial number and check if it is included in the list
       # Known detectors for reversed-phi in SPring-8: BL41XU PILATUS3 6M 60-0125
@@ -623,7 +633,8 @@ elif [ "$DET" == "Bruker-cbf" ]; then
  PHI=`awk '/PHI \? \? \?/{print $5}' tmp2`
  DELTAPHI=`awk '/PHI \? \? \?/{printf "%5.4f",$6}' tmp2`
  KAPPA=`awk '/CHI \? \? \?/{print $5}' tmp2`
- echo OMEGA DELTAOMEGA PHI DELTAPHI KAPPA= $OMEGA $DELTAOMEGA $PHI $DELTAPHI $KAPPA
+# echo OMEGA DELTAOMEGA PHI DELTAPHI KAPPA= $OMEGA $DELTAOMEGA $PHI $DELTAPHI $KAPPA
+
 # test whether the absolute value of deltaphi is > absolute value of deltaomega
  if (( $(echo "${DELTAPHI}^2 > ${DELTAOMEGA}^2"|bc -l) )); then
     echo PHI scan
@@ -632,13 +643,17 @@ elif [ "$DET" == "Bruker-cbf" ]; then
     R2=`echo "scale=7; c($KAPPA/$DEGTOR)         	  " | bc -l`
     rotation_axis="$R1 $R2 $R3"
     OSCILLATION_RANGE=${DELTAPHI}
+    STARTING_ANGLE=${PHI}
 # here we could check if DELTAPHI is <0, and if so, negate it and rotation_axis
  else
     echo OMEGA scan
     rotation_axis="0 -1 0"
     OSCILLATION_RANGE=${DELTAOMEGA}
+    STARTING_ANGLE=${OMEGA}
 # here we could check if DELTAOMEGA is <0, and if so, negate it and rotation_axis
  fi
+ echo STARTING_ANGLE= $STARTING_ANGLE        ! only read by IDXREF                
+
 # 2theta
   TWOTHETA=`awk '/TWOTHETA \? \? \?/{print $5}' tmp2`
   echo TWOTHETA=$TWOTHETA
@@ -653,7 +668,7 @@ fi
 
 echo ORGX= $ORGX ORGY= $ORGY - check these values with adxv !
 echo DETECTOR_DISTANCE= $DETECTOR_DISTANCE  ! only read by XYCORR, IDXREF                     
-echo OSCILLATION_RANGE= $OSCILLATION_RANGE  ! only read by IDXREF                 
+echo OSCILLATION_RANGE= $OSCILLATION_RANGE  ! only read by IDXREF 
 echo X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH    ! only read by IDXREF                   
 
 # now we know everything that is required to generate XDS.INP
@@ -664,7 +679,8 @@ JOB= XYCORR INIT COLSPOT IDXREF DEFPIX INTEGRATE CORRECT
 ORGX= $ORGX ORGY= $ORGY  ! values from frame header; only read by XYCORR, IDXREF     
 $COMMENT_ORGXY
 DETECTOR_DISTANCE= $DETECTOR_DISTANCE !read by XYCORR, IDXREF. Negative if detector normal points to crystal.               
-OSCILLATION_RANGE= $OSCILLATION_RANGE                    
+OSCILLATION_RANGE= $OSCILLATION_RANGE   
+STARTING_ANGLE= $STARTING_ANGLE                 
 X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH                      
 NAME_TEMPLATE_OF_DATA_FRAMES=$NAME_TEMPLATE_OF_DATA_FRAMES
 ! REFERENCE_DATA_SET=xxx/XDS_ASCII.HKL ! e.g. to ensure consistent indexing  
