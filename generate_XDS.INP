@@ -85,7 +85,8 @@
 # revision 0.80 . KD 13/02/2018 remove DISTANCE keyword from REFINE() list; remove POSITION from REFINE(IDXREF)
 # revision 0.81 . KD 21/02/2018 when encountering CBF files from Eiger (ESRF), treat as Pilatus detector
 # revision 0.82 . KD 01/03/2018 STARTING_ANGLE for MarCCD/Pilatus/PHOTON, enabling to use dials.rs_mapper with spot2pdb.
-REVISION="0.82 (01-Mar-2018)"
+# revision 0.83 . KD 25/06/2018 for ADSC detector #458 at APS BM19, revert the definition of ROTATION_AXIS=-1 0 0. See "Beamline notes" in this wiki.
+REVISION="0.83 (25-Jun-2018)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -377,9 +378,9 @@ elif [ "$DET" == "adsc" ]; then
 
       # Check detector serial number and recognize beamline for reversed-phi setting.
       # Known detectors for reversed-phi in SPring-8: 915: BL38B1 Q315; APS 19-ID: 458; BM30A: 924
+      # revision 0.83 of this script removes 458 from the list!
       REVERSEPHI_SNs="
 915
-458
 924
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
