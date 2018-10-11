@@ -86,7 +86,8 @@
 # revision 0.81 . KD 21/02/2018 when encountering CBF files from Eiger (ESRF), treat as Pilatus detector
 # revision 0.82 . KD 01/03/2018 STARTING_ANGLE for MarCCD/Pilatus/PHOTON, enabling to use dials.rs_mapper with spot2pdb.
 # revision 0.83 . KD 25/06/2018 for ADSC detector #458 at APS BM19, revert the definition of ROTATION_AXIS=-1 0 0. See "Beamline notes" in this wiki.
-REVISION="0.83 (25-Jun-2018)"
+# revision 0.84 . KD 10/10/2018 implement Pilatus detector with d*TREK header -
+REVISION="0.84 (10-Oct-2018)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -112,7 +113,10 @@ if [ "$1" == "help" ] || [ "$1" == "-help" ] || [ "$1" == "-h" ]; then
 fi                                                                                                               
 #                                                                                                                
 # defaults:                                                                                                      
-#                                                                                                                
+#       
+# conversion radian / degrees:
+DEGTOR=57.2957795
+                                                                                                         
 DETECTOR="XXX MINIMUM_VALID_PIXEL_VALUE=XXX OVERLOAD=XXX"                                                        
 REVERSE_PHI="no"
 ORGX=XXX                                                                                                         
@@ -133,6 +137,9 @@ DIRECTION_OF_DETECTOR_X_AXIS="1 0 0"
 # default FRACTION_OF_POLARIZATION
 pol_frac=0.98
 STARTING_ANGLE=0
+dtrek_det=""
+SEPMIN=7.0
+CLUSTER_RADIUS=3.5
 
 dname=`echo "$1" | xargs dirname`
 test "${dname}" == "" && dname="."
@@ -414,6 +421,8 @@ elif [ "$DET" == "pilatus" ]; then
   sed s/#// tmp2 > tmp1                                                     
   mv tmp1 tmp2                                                              
   OVERLOAD=1048574
+  SEPMIN=4
+  CLUSTER_RADIUS=2
   grep -q Count_cutoff tmp2 && OVERLOAD=`awk '/Count_cutoff/{print $2}' tmp2`
   DETECTOR="PILATUS MINIMUM_VALID_PIXEL_VALUE=0 OVERLOAD= $OVERLOAD  !PILATUS"
   QX=0.172 QY=0.172                                                         
@@ -489,6 +498,8 @@ elif [ "$DET" == "eiger" ]; then
 
   # If rotation vector set (NeXus)
   rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME 2>/dev/null | grep "(0):" | sed -e "s/^.*://; s/,//g"`
+  SEPMIN=4
+  CLUSTER_RADIUS=2
   
 elif [ "$DET" == "raxis" ]; then
   echo Data from a RAXIS detector
@@ -512,13 +523,13 @@ elif [ "$DET" == "raxis" ]; then
   X_RAY_WAVELENGTH=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(292);print "%.6f"%struct.unpack(">f",f.read(4))')
 
 elif [ "$DET" == "dtrek" ]; then
-  echo "Data from a RAXIS or Saturn detector with dTREK format"
+  echo "Data from a RAXIS or Saturn or Pilatus detector with dTREK format"
 
   sed s/\;// tmp2 > tmp1
   mv tmp1 tmp2
 
   dname=`grep "DETECTOR_NAMES=" tmp2 | sed -e "s/.*=//"`
-
+  flip=1
   if [ "$dname" == "CCD_" ]; then
     DETECTOR="SATURN MINIMUM_VALID_PIXEL_VALUE=1"
     dtrek_det="saturn"
@@ -535,11 +546,27 @@ elif [ "$DET" == "dtrek" ]; then
     echo "Please report this to XDSwiki author."
     echo ""
    fi
-  else # should be RX_
+  elif [ "$dname" == "PILT_" ]; then
+    DETECTOR="PILATUS MINIMUM_VALID_PIXEL_VALUE=0"
+    dtrek_det="pilatus"
+    SEPMIN=3
+    CLUSTER_RADIUS=1.5
+    rotation_axis="0 1 0"   # TODO: read from header
+    flip=-1
+    SENSOR_THICKNESS=0.45   # TODO: read from header
+# 2theta
+    TWOTHETA=`awk '/PILT_GONIO_VALUES=/{print $2}' tmp2`
+    echo TWOTHETA=$TWOTHETA
+    R1=`echo "scale=7;  c($TWOTHETA/$DEGTOR)" | bc -l`
+    R3=`echo "scale=7; -s($TWOTHETA/$DEGTOR)" | bc -l`
+    DIRECTION_OF_DETECTOR_X_AXIS="$R1 0 $R3"
+  elif [ "$dname" == "RX_" ]; then
     DETECTOR="RAXIS MINIMUM_VALID_PIXEL_VALUE=0"
     dtrek_det="raxis"
+  else
+    DETECTOR="XXX MINIMUM_VALID_PIXEL_VALUE=XXX"
+    dtrek_det="unknown" 
   fi
-
   # find OVERLOAD
   SATURATED_VALUE=`grep SATURATED_VALUE tmp2 | head -1 | sed s/SATURATED_VALUE=//`
   DETECTOR="${DETECTOR}  OVERLOAD=${SATURATED_VALUE}"
@@ -569,8 +596,13 @@ elif [ "$DET" == "dtrek" ]; then
   do
    idx=$((i-1))
    if [ "${GONIO_NAMES[$idx]}" == "Distance" ]; then
+    DETECTOR_DISTANCE="${GONIO_VALUES[$idx]}"
+    # TODO: Check unit!! - ${GONIO_UNITS[$idx]}
+   fi
+   if [ $flip -gt 0 ]; then 
     DETECTOR_DISTANCE="-${GONIO_VALUES[$idx]}"
     # TODO: Check unit!! - ${GONIO_UNITS[$idx]}
+    echo "using distance <0"
    fi
   done
 
@@ -602,8 +634,6 @@ elif [ "$DET" == "MAR345" ]; then
 elif [ "$DET" == "Bruker-cbf" ]; then
   
  echo  "Data from a Bruker-cbf detector"
-# conversion radian / degrees:
- DEGTOR=57.2957795
 # MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT:
  MNOPIAS=6 
 # use complete detector including corners:
@@ -713,8 +743,8 @@ TRUSTED_REGION=$TRUSTED_REGION
 VALUE_RANGE_FOR_TRUSTED_DETECTOR_PIXELS=6000. 30000. ! often 7000 or 8000 is ok
 STRONG_PIXEL=4           ! COLSPOT: only use strong reflections (default is 3)
 MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=$MNOPIAS ! default of 6 is sometimes too high
-! close spots/long cell axis: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 6 and 3
-! SEPMIN=4  CLUSTER_RADIUS=2 ! should be default for Pilatus and other detectors with low PSF
+! close spots/long cell axis: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 7 and 3.5
+SEPMIN=$SEPMIN  CLUSTER_RADIUS=$CLUSTER_RADIUS ! 4 and 2 for Pixel Array Detectors
 ! since XDS 01-MAR-2015, POSITION supersedes DISTANCE.
 ! nowadays headers are usually correct so refine POSITION in INTEGRATE but not IDXREF
 REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS  ! refine POSITION only if known that header distance inaccurate
@@ -798,7 +828,6 @@ elif [ "$DET" == "adsc-CMOS1" ]; then
   echo UNTRUSTED_RECTANGLE= 0 1468  2451 2631  >> XDS.INP
 elif [ "$DET" == "pilatus" -o "$DET" == "eiger" ]; then
 cat >> XDS.INP << eof
-SEPMIN=4 CLUSTER_RADIUS=2
 NUMBER_OF_PROFILE_GRID_POINTS_ALONG_ALPHA/BETA=13 ! Default is 9 - Increasing may improve data 
 NUMBER_OF_PROFILE_GRID_POINTS_ALONG_GAMMA=13      ! accuracy, particularly if finely-sliced on phi, 
 !                                                   and does not seem to have any downsides. 
@@ -893,4 +922,3 @@ echo http://www.mpimf-heidelberg.mpg.de/~kabsch/xds . More documentation in XDSw
 echo After running xds, inspect, using XDS-Viewer, at least the beamstop mask in
 echo BKGPIX.cbf, and the agreement of predicted and observed spots in FRAME.cbf!
 rm -f tmp1 tmp2
-# end of generate_XDS.INP
