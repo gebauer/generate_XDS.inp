@@ -86,8 +86,9 @@
 # revision 0.81 . KD 21/02/2018 when encountering CBF files from Eiger (ESRF), treat as Pilatus detector
 # revision 0.82 . KD 01/03/2018 STARTING_ANGLE for MarCCD/Pilatus/PHOTON, enabling to use dials.rs_mapper with spot2pdb.
 # revision 0.83 . KD 25/06/2018 for ADSC detector #458 at APS BM19, revert the definition of ROTATION_AXIS=-1 0 0. See "Beamline notes" in this wiki.
-# revision 0.84 . KD 10/10/2018 implement Pilatus detector with d*TREK header -
-REVISION="0.84 (10-Oct-2018)"
+# revision 0.84 . KD 10/10/2018 implement Pilatus detector with d*TREK header 
+# revision 0.85 . Jie Nan 09/01/2019 STARTING_ANGLE for Eiger
+REVISION="0.85 (09-Jan-2019)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -495,6 +496,9 @@ elif [ "$DET" == "eiger" ]; then
   # find DETECTOR_DISTANCE and OSCILLATION_RANGE:
   DETECTOR_DISTANCE=`h5dump -d "/entry/instrument/detector/detector_distance" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
   OSCILLATION_RANGE=`h5dump -d "/entry/sample/goniometer/omega_range_average" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
+  
+  #STARTING_ANGLE:
+  STARTING_ANGLE=`h5dump -d "/entry/sample/goniometer/omega_start" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
 
   # If rotation vector set (NeXus)
   rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME 2>/dev/null | grep "(0):" | sed -e "s/^.*://; s/,//g"`
