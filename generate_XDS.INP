@@ -88,7 +88,8 @@
 # revision 0.83 . KD 25/06/2018 for ADSC detector #458 at APS BM19, revert the definition of ROTATION_AXIS=-1 0 0. See "Beamline notes" in this wiki.
 # revision 0.84 . KD 10/10/2018 implement Pilatus detector with d*TREK header 
 # revision 0.85 . Jie Nan 09/01/2019 STARTING_ANGLE for Eiger
-REVISION="0.85 (09-Jan-2019)"
+# revision 0.86 . Keitaro 03/05/2019 Add PILATUS3 6M, S/N 60-0123 at SSRF BL18U-1 with ROTATION_AXIS=-1 0 0
+REVISION="0.86 (03-May-2019)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -464,6 +465,7 @@ PILATUS3 6M, S/N 60-0125
 PILATUS3 6M, S/N 60-0132
 PILATUS 2M, S/N 24-0109
 PILATUS3 6M, S/N 60-0127
+PILATUS3 6M, S/N 60-0123
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
         REVERSE_PHI="yes"
