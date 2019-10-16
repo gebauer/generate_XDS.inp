@@ -89,7 +89,8 @@
 # revision 0.84 . KD 10/10/2018 implement Pilatus detector with d*TREK header 
 # revision 0.85 . Jie Nan 09/01/2019 STARTING_ANGLE for Eiger
 # revision 0.86 . Keitaro 03/05/2019 Add PILATUS3 6M, S/N 60-0123 at SSRF BL18U-1 with ROTATION_AXIS=-1 0 0
-REVISION="0.86 (03-May-2019)"
+# revision 0.87 . KD 12/10/2019 Add PILATUS XXX, S/N XX-XXX at SSRF BL19U1 and MarCCD detector #43 at BL17B1 with ROTATION_AXIS=-1 0 0
+REVISION="0.87 (13-Oct-2019)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -102,7 +103,7 @@ REVISION="0.86 (03-May-2019)"
 # - on Mac OS X, the Xcode command line tools (from https://developer.apple.com/download/more/) are needed.                            
 #                                                                                                                
 # notes for debugging of the script:                                                                             
-# - add the -v option to the first line, to see where an error occurs                                            
+# - add the -x option to the first line, to see where an error occurs                                            
 # - comment out the removal of tmp1 and tmp2 in the last line                                                    
 #                                                                                                                
 # ====== Start of script ======                                                                                  
@@ -238,12 +239,14 @@ elif [ "$DET" == "mccd" ]; then
 
   # Check detector serial number and recognize beamline for reversed-phi setting.
   # Known detectors for reversed-phi in SPring-8: 24: BL26B2 Mar225, 31: BL32XU MX225HE, 38: BL44XU MX225HE, 42: BL44XU MX300HE, 40: BL41XU MX225HE, 106: BL32XU MX225HS
+  # same for SSRF: BL17B1 rayonix MX300. As on 2019-10-13, this also needs doubling of ORGX and ORGY. But the beamline staff (Wenming) wants to fix the header.
   REVERSEPHI_SNs="
 24
 31
 38
 40
 42
+43
 106
 "
   # get detector serial number and check if it is included in the list
@@ -459,6 +462,7 @@ elif [ "$DET" == "pilatus" ]; then
       # Known detectors for reversed-phi in APS: 19ID PILATUS3 6M 60-0132
       # Known detectors for reversed-phi at MX2 beamline (Brazilian Synchrotron National Laboratory - LNLS)
       # Known detectors for reversed-phi at CHESS F1 PILATUS3 6M, S/N 60-0127
+      # Known detectors for reversed-phi at SSRF BL18U1 (S/N 60-0123) and BL19U1 (S/N XX-XXX) (!; 2019-10-19: staff will fix this)
       DET_SN=`grep "Detector:" tmp2 | sed "s/^.*Detector: *//"`
       REVERSEPHI_SNs="
 PILATUS3 6M, S/N 60-0125
@@ -466,6 +470,7 @@ PILATUS3 6M, S/N 60-0132
 PILATUS 2M, S/N 24-0109
 PILATUS3 6M, S/N 60-0127
 PILATUS3 6M, S/N 60-0123
+PILATUS XXX, S/N XX-XXX
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
         REVERSE_PHI="yes"
