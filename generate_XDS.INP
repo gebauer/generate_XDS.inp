@@ -90,7 +90,8 @@
 # revision 0.85 . Jie Nan 09/01/2019 STARTING_ANGLE for Eiger
 # revision 0.86 . Keitaro 03/05/2019 Add PILATUS3 6M, S/N 60-0123 at SSRF BL18U-1 with ROTATION_AXIS=-1 0 0
 # revision 0.87 . KD 12/10/2019 Add PILATUS XXX, S/N XX-XXX at SSRF BL19U1 and MarCCD detector #43 at BL17B1 with ROTATION_AXIS=-1 0 0
-REVISION="0.87 (13-Oct-2019)"
+# revision 0.88 . KD 16/10/2019 fixes for SSRF, add "-maxdepth 1" to "find -H ..."
+REVISION="0.88 (16-Oct-2019)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -153,7 +154,7 @@ NAME_TEMPLATE_OF_DATA_FRAMES="${dname}/${bname}"
 # don't accept the "direct beam" shot at SLS/Pilatus PX-I and PX-II 
 # cope with blanks in directory / file name
 IFS=$'\n'
-find -H $dname -name "$bname" -or -name "${bname}.bz2" -or -name "${bname}.gz" -or -name "${bname}.xz" | egrep -v "_00000.cbf|_000.img" | sort > tmp1
+find -H $dname -maxdepth 1 -name "$bname" -or -name "${bname}.bz2" -or -name "${bname}.gz" -or -name "${bname}.xz" | egrep -v "_00000.cbf|_000.img" | sort > tmp1
 if [ ! -s tmp1 ]
 then
  echo "Error! No files matched: $1"
@@ -470,9 +471,11 @@ PILATUS3 6M, S/N 60-0132
 PILATUS 2M, S/N 24-0109
 PILATUS3 6M, S/N 60-0127
 PILATUS3 6M, S/N 60-0123
-PILATUS XXX, S/N XX-XXX
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
+        REVERSE_PHI="yes"
+      fi
+      if [ "$DET_SN" == "{PILATUS XX, S/N XX-XXX}" ] ; then
         REVERSE_PHI="yes"
       fi
       
@@ -509,6 +512,12 @@ elif [ "$DET" == "eiger" ]; then
 
   # If rotation vector set (NeXus)
   rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME 2>/dev/null | grep "(0):" | sed -e "s/^.*://; s/,//g"`
+  # Eiger 16M SSRF BL17U1 
+  SN=`h5dump -d "/entry/instrument/detector/detector_number" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
+  if [ "$SN" == "E-32-0111" ]; then
+    rotation_axis="-1 0 0"
+  fi
+
   SEPMIN=4
   CLUSTER_RADIUS=2
   
@@ -778,7 +787,7 @@ if [ "$DET" == "eiger" ] && [ "$is_h5" == 1 ]; then
     echo LIB= line was written to XDS.INP
   else
     echo !LIB=/usr/local/lib64/dectris-neggia.so >> XDS.INP
-    echo /usr/local/lib64/dectris-neggia.so was not found!
+    echo /usr/local/lib64/dectris-neggia.so was not found - specify location manually!
   fi
 fi 
 
@@ -795,7 +804,7 @@ else
  if [ "$rotation_axis" != "" ]; then
   echo "ROTATION_AXIS= $rotation_axis  ! only read by IDXREF" >> XDS.INP
  elif [ "$REVERSE_PHI" == "no" ]; then
-  echo 'ROTATION_AXIS=1 0 0  ! Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8, SSRF BL17U need -1 0 0. Diamond ID24 needs 0 -1 0' >> XDS.INP
+  echo 'ROTATION_AXIS=1 0 0  ! Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8, SSRF need -1 0 0. Diamond ID24 needs 0 -1 0' >> XDS.INP
  else
   echo 'ROTATION_AXIS=-1 0 0  ! if this is wrong, please contact author.' >> XDS.INP
  fi
