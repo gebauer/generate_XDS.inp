@@ -91,7 +91,8 @@
 # revision 0.86 . Keitaro 03/05/2019 Add PILATUS3 6M, S/N 60-0123 at SSRF BL18U-1 with ROTATION_AXIS=-1 0 0
 # revision 0.87 . KD 12/10/2019 Add PILATUS XXX, S/N XX-XXX at SSRF BL19U1 and MarCCD detector #43 at BL17B1 with ROTATION_AXIS=-1 0 0
 # revision 0.88 . KD 16/10/2019 fixes for SSRF, add "-maxdepth 1" to "find -H ..."
-REVISION="0.88 (16-Oct-2019)"
+# revision 0.89 . KD 21/10/2019 add ADSC S/N 905 at ALS 8.2.1, S/N 928 at Australian Synchrotron MX2 beamline; final SSRF fixes
+REVISION="0.89 (23-Oct-2019)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -332,15 +333,15 @@ elif [ "$DET" == "adsc" ]; then
       QY=$QX                                               
       BEAM_CENTER_X=`grep BEAM_CENTER_X tmp2 | sed s/BEAM_CENTER_X=//`
       BEAM_CENTER_Y=`grep BEAM_CENTER_Y tmp2 | sed s/BEAM_CENTER_Y=//`
-# fix 2010-04-26 - tell user about possible ORGX, ORGY alternatives -  
+ 
       COMMENT_ORGXY="
 ! Following are possible beam center interpretations for ADSC detectors"
-# at ESRF, PF, ALS 5.0.2 and ... (pls fill in!) the following should be used:         
+# at ESRF, PF, ALS 5.0.2, AS MX2 and ... (pls fill in!) the following should be used:         
       ORGX1=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l`
       ORGY1=`echo "scale=1; $BEAM_CENTER_X/$QX" | bc -l`
-      echo - at ESRF, PF, APS Argonne BLs use: ORGX=$ORGX1 ORGY=$ORGY1                    
+      echo - at ESRF, PF, ALS 8.2.1, APS Argonne BLs use: ORGX=$ORGX1 ORGY=$ORGY1                    
       COMMENT_ORGXY="${COMMENT_ORGXY}
-! ORGX= $ORGX1 ORGY= $ORGY1 ! For ESRF, PF, APS Argonne ..."
+! ORGX= $ORGX1 ORGY= $ORGY1 ! For ESRF, PF, APS, AS MX2 ..."
 # this 2nd alternative convention should be used at the following beamlines (pls complete the list): ALS 5.0.3, ...
       ORGX2=`echo "scale=1; $NX-$BEAM_CENTER_X/$QX" | bc -l `
       ORGY2=`echo "scale=1; $BEAM_CENTER_Y/$QX" | bc -l `
@@ -363,7 +364,8 @@ elif [ "$DET" == "adsc" ]; then
 
       # Decision of beam center convention based on detector serial numbers.
       DET_SN=`grep DETECTOR_SN tmp2 | sed -e "s/DETECTOR_SN=//"`
-      # For convention 1; Known PF detectors = 449: NW12A Q210, 472: NE3A Q270, 474: BL17A Q270, 912: BL5A Q315, 923: ALS BL5.0.2 Q315, 933: AichiSR BL2S1 Q315, 916: APS 24 IDE
+      echo Detector serial number is $DET_SN
+      # For convention 1; Known PF detectors = 449: NW12A Q210, 472: NE3A Q270, 474: BL17A Q270, 912: BL5A Q315, 923: ALS BL5.0.2 Q315, 933: AichiSR BL2S1 Q315, 916: APS 24 IDE, 928: AS MX2
       ORG1_SNs="
 449
 472
@@ -374,6 +376,8 @@ elif [ "$DET" == "adsc" ]; then
 911
 446
 916
+905
+928
 "
       ORG4_SNs="
 915
@@ -381,20 +385,25 @@ elif [ "$DET" == "adsc" ]; then
       if echo "${DET_SN}${ORG1_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
        ORGX=$ORGX1
        ORGY=$ORGY1
+       echo the following was chosen based on detector serial number:
       elif echo "${DET_SN}${ORG4_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
        ORGX=$ORGX4
        ORGY=$ORGY4
+       echo the following was chosen based on detector serial number:
       else
        ORGX=$ORGX3
        ORGY=$ORGY3
+       echo the following default was chosen because the detector serial number was not special-cased:
       fi
 
       # Check detector serial number and recognize beamline for reversed-phi setting.
       # Known detectors for reversed-phi in SPring-8: 915: BL38B1 Q315; APS 19-ID: 458; BM30A: 924
+      # 928 is at Australian Beamline MX2
       # revision 0.83 of this script removes 458 from the list!
       REVERSEPHI_SNs="
 915
 924
+928
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
         REVERSE_PHI="yes"
@@ -475,8 +484,9 @@ PILATUS3 6M, S/N 60-0123
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
         REVERSE_PHI="yes"
       fi
-      if [ "$DET_SN" == "{PILATUS XX, S/N XX-XXX}" ] ; then
+      if [ "$DET_SN" == "PILATUS XXX, S/N XX-XXX" ] ; then
         REVERSE_PHI="yes"
+        echo inverted rotation axis at SSRF BL19U1
       fi
       
 # Diamond I24:
@@ -513,9 +523,10 @@ elif [ "$DET" == "eiger" ]; then
   # If rotation vector set (NeXus)
   rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME 2>/dev/null | grep "(0):" | sed -e "s/^.*://; s/,//g"`
   # Eiger 16M SSRF BL17U1 
-  SN=`h5dump -d "/entry/instrument/detector/detector_number" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
+  SN=`h5dump -d "/entry/instrument/detector/detector_number" $FIRSTFRAME | awk '/\(0\): /{print $2}' | sed s/\"//g`
   if [ "$SN" == "E-32-0111" ]; then
     rotation_axis="-1 0 0"
+    echo SSRF BL17U1 with inverted rotation axis
   fi
 
   SEPMIN=4
