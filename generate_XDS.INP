@@ -92,7 +92,8 @@
 # revision 0.87 . KD 12/10/2019 Add PILATUS XXX, S/N XX-XXX at SSRF BL19U1 and MarCCD detector #43 at BL17B1 with ROTATION_AXIS=-1 0 0
 # revision 0.88 . KD 16/10/2019 fixes for SSRF, add "-maxdepth 1" to "find -H ..."
 # revision 0.89 . KD 21/10/2019 add ADSC S/N 905 at ALS 8.2.1, S/N 928 at Australian Synchrotron MX2 beamline; final SSRF fixes
-REVISION="0.89 (23-Oct-2019)"
+# revision 0.90 . KD 25/10/2019 add OLDMAR detector type. Tested w/ SBGrid data set 6. Anomalous signal may have wrong hand!
+REVISION="0.90 (25-Oct-2019)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -218,7 +219,8 @@ if [ "$is_h5" == 0 ]; then
  grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
  grep -q mar345 tmp2		 && DET=MAR345     
  grep -q BRUKER tmp2 && grep -q CBF tmp2  && DET=Bruker-cbf   
- grep -q CMOS1 tmp2 && DET=adsc-CMOS1                   
+ grep -q CMOS1 tmp2 && DET=adsc-CMOS1   
+ grep -q MARCONTROL tmp2 && DET=OLDMAR                    
 else
  h5dump -d "/entry/instrument/detector/description" $FIRSTFRAME | grep -i Eiger > /dev/null && DET=eiger
 fi
@@ -661,7 +663,25 @@ elif [ "$DET" == "MAR345" ]; then
  DETECTOR_DISTANCE=`grep 'DISTANCE' tmp2 | awk '{print $2}'`               
  X_RAY_WAVELENGTH=`grep 'WAVELENGTH' tmp2 | awk '{print $2}'` 
  OSCILLATION_RANGE=`grep 'PHI' tmp2 | awk '{print $5-$3}'`    
- TRUSTED_REGION="0 0.99"        
+ TRUSTED_REGION="0 0.99"    
+  
+elif [ "$DET" == "OLDMAR" ]; then
+  
+ echo  "Data from old type MAR image plate detector"
+ DETECTOR="MAR  MINIMUM_VALID_PIXEL_VALUE=0  OVERLOAD=130000"
+ NX=`awk 'NR==2 {print $2}' tmp2`
+ NY=$NX
+ QX=`awk 'NR==2 {print $15}' tmp2`
+ QY=$QX
+ ORGX=`awk 'NR==2 {print $19}' tmp2`
+ ORGY=`awk 'NR==2 {print $20}' tmp2`
+ DETECTOR_DISTANCE=`awk 'NR==2 {print $22}' tmp2`               
+ X_RAY_WAVELENGTH=`awk 'NR==2 {print $21}' tmp2` 
+ OSCILLATION_RANGE=`awk 'NR==2 {print $24-$23}' tmp2`    
+ TRUSTED_REGION="0 0.99"   
+ rotation_axis="0 1 0"  
+ echo unsure if sign of anomalous signal is correct - please verify or try both hands!
+       
 elif [ "$DET" == "Bruker-cbf" ]; then
   
  echo  "Data from a Bruker-cbf detector"
@@ -777,9 +797,10 @@ MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=$MNOPIAS ! default of 6 is sometimes too high
 ! close spots/long cell axis: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 7 and 3.5
 SEPMIN=$SEPMIN  CLUSTER_RADIUS=$CLUSTER_RADIUS ! 4 and 2 for Pixel Array Detectors
 ! since XDS 01-MAR-2015, POSITION supersedes DISTANCE.
-! nowadays headers are usually correct so refine POSITION in INTEGRATE but not IDXREF
-REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS  ! refine POSITION only if known that header distance inaccurate
-REFINE(INTEGRATE)= POSITION BEAM ORIENTATION ! AXIS CELL
+! nowadays headers are usually correct so refine POSITION in INTEGRATE but not IDXREF if low to medium resolution
+! however, if the spots from COLSPOT extend to 2A then POSITION could, and if 1.5A POSITION should be refined
+REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS  ! add POSITION if high resolution, or DETECTOR_DISTANCE inaccurate
+REFINE(INTEGRATE)= POSITION BEAM ORIENTATION ! AXIS CELL . If 1.5A or higher it is ok to refine CELL
 ! REFINE(CORRECT)=CELL BEAM ORIENTATION AXIS POSITION ! Default is: refine everything
 
 ! parameters specifically for this detector and beamline:
