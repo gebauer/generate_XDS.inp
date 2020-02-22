@@ -93,7 +93,8 @@
 # revision 0.88 . KD 16/10/2019 fixes for SSRF, add "-maxdepth 1" to "find -H ..."
 # revision 0.89 . KD 21/10/2019 add ADSC S/N 905 at ALS 8.2.1, S/N 928 at Australian Synchrotron MX2 beamline; final SSRF fixes
 # revision 0.90 . KD 25/10/2019 add OLDMAR detector type. Tested w/ SBGrid data set 6. Anomalous signal may have wrong hand!
-REVISION="0.90 (25-Oct-2019)"
+# revision 0.91 . KD 16/01/2020 Allow negative starting angle for Eiger (found -33 at SLS !).
+REVISION="0.91 (16-Jan-2020)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -520,7 +521,8 @@ elif [ "$DET" == "eiger" ]; then
   OSCILLATION_RANGE=`h5dump -d "/entry/sample/goniometer/omega_range_average" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
   
   #STARTING_ANGLE:
-  STARTING_ANGLE=`h5dump -d "/entry/sample/goniometer/omega_start" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
+  # the \- was introduced in version 0.91 :
+  STARTING_ANGLE=`h5dump -d "/entry/sample/goniometer/omega_start" $FIRSTFRAME | awk '/\(0\): [\-0-9]/{print $2}'`
 
   # If rotation vector set (NeXus)
   rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME 2>/dev/null | grep "(0):" | sed -e "s/^.*://; s/,//g"`
