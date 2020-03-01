@@ -94,7 +94,8 @@
 # revision 0.89 . KD 21/10/2019 add ADSC S/N 905 at ALS 8.2.1, S/N 928 at Australian Synchrotron MX2 beamline; final SSRF fixes
 # revision 0.90 . KD 25/10/2019 add OLDMAR detector type. Tested w/ SBGrid data set 6. Anomalous signal may have wrong hand!
 # revision 0.91 . KD 16/01/2020 Allow negative starting angle for Eiger (found -33 at SLS !).
-REVISION="0.91 (16-Jan-2020)"
+# revision 0.92 . KD 27/02/2020 read *_master.h5 from Diamond Light Source
+REVISION="0.92 (27-Feb-2020)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -499,13 +500,39 @@ PILATUS3 6M, S/N 60-0123
         fi
       fi
 # insert similar code for Petra P14 here
+
 elif [ "$DET" == "eiger" ]; then
-  OVERLOAD=`h5dump -d "/entry/instrument/detector/detectorSpecific/countrate_correction_count_cutoff" $FIRSTFRAME | awk '/\(0\):/{print $2}' `
+# find out if HDF5 from Diamond (DLS=1) or Dectris (DLS=0)
+  DLS=0
+  OVERLOAD=`h5dump -d "/entry/instrument/detector/detectorSpecific/countrate_correction_count_cutoff" $FIRSTFRAME 2>/dev/null` || DLS=1 
+  if [ "$DLS" == 1 ]; then
+    echo Eiger HDF5 from Diamond
+    OVERLOAD=`h5dump -d "/entry/instrument/detector/saturation_value" $FIRSTFRAME | awk '/\(0\):/{print $2}'`
+    OSCILLATION_RANGE=`h5dump -d "/entry/data/omega" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $3-$2}'`
+    STARTING_ANGLE=`h5dump    -d "/entry/data/omega" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}' | sed -e "s/,//"`
+    echo OSCILLATION_RANGE=$OSCILLATION_RANGE STARTING_ANGLE=$STARTING_ANGLE
+  # rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME 2>/dev/null | grep "(0):" | sed -e "s/^.*://; s/,//g"`
+  # the above gives -1 0 0 for DLS data instead of the correct 1 0 0, so commented out for now
+  else
+    echo Eiger HDF5 from Dectris
+    OVERLOAD=`h5dump -d "/entry/instrument/detector/detectorSpecific/countrate_correction_count_cutoff" $FIRSTFRAME | awk '/\(0\):/{print $2}'`    
+    OSCILLATION_RANGE=`h5dump -d "/entry/sample/goniometer/omega_range_average" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
+  # STARTING_ANGLE:  the \- was introduced in version 0.91 to allow negative values :
+    STARTING_ANGLE=`h5dump -d "/entry/sample/goniometer/omega_start" $FIRSTFRAME | awk '/\(0\): [\-0-9]/{print $2}'`
+  # If rotation vector set (NeXus)
+    rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME 2>/dev/null | grep "(0):" | sed -e "s/^.*://; s/,//g"`
+  # Eiger 16M SSRF BL17U1 
+    SN=`h5dump -d "/entry/instrument/detector/detector_number" $FIRSTFRAME | awk '/\(0\): /{print $2}' | sed s/\"//g`
+    if [ "$SN" == "E-32-0111" ]; then
+      rotation_axis="-1 0 0"
+      echo SSRF BL17U1 with inverted rotation axis
+    fi 
+  fi
   DETECTOR="EIGER MINIMUM_VALID_PIXEL_VALUE=0 OVERLOAD= $OVERLOAD"
   QX=`h5dump -d "/entry/instrument/detector/x_pixel_size" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
   QY=`h5dump -d "/entry/instrument/detector/y_pixel_size" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
 
-  echo Data from a Eiger hdf5
+  echo OVERLOAD=$OVERLOAD
   SENSOR_THICKNESS=`h5dump -d "/entry/instrument/detector/sensor_thickness" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
   X_RAY_WAVELENGTH=`h5dump -d "/entry/instrument/beam/incident_wavelength" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
 
@@ -516,26 +543,12 @@ elif [ "$DET" == "eiger" ]; then
   ORGX=`h5dump -d "/entry/instrument/detector/beam_center_x" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
   ORGY=`h5dump -d "/entry/instrument/detector/beam_center_y" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
 
-  # find DETECTOR_DISTANCE and OSCILLATION_RANGE:
-  DETECTOR_DISTANCE=`h5dump -d "/entry/instrument/detector/detector_distance" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
-  OSCILLATION_RANGE=`h5dump -d "/entry/sample/goniometer/omega_range_average" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
-  
-  #STARTING_ANGLE:
-  # the \- was introduced in version 0.91 :
-  STARTING_ANGLE=`h5dump -d "/entry/sample/goniometer/omega_start" $FIRSTFRAME | awk '/\(0\): [\-0-9]/{print $2}'`
-
-  # If rotation vector set (NeXus)
-  rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME 2>/dev/null | grep "(0):" | sed -e "s/^.*://; s/,//g"`
-  # Eiger 16M SSRF BL17U1 
-  SN=`h5dump -d "/entry/instrument/detector/detector_number" $FIRSTFRAME | awk '/\(0\): /{print $2}' | sed s/\"//g`
-  if [ "$SN" == "E-32-0111" ]; then
-    rotation_axis="-1 0 0"
-    echo SSRF BL17U1 with inverted rotation axis
-  fi
+  # find DETECTOR_DISTANCE :
+  DETECTOR_DISTANCE=`h5dump -d "/entry/instrument/detector/detector_distance" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`  
 
   SEPMIN=4
   CLUSTER_RADIUS=2
-  
+
 elif [ "$DET" == "raxis" ]; then
   echo Data from a RAXIS detector
 
@@ -816,13 +829,23 @@ NX= $NX NY= $NY  QX= $QX  QY= $QY ! to make CORRECT happy if frames are unavaila
 eof
 
 if [ "$DET" == "eiger" ] && [ "$is_h5" == 1 ]; then
-  if [ -e /usr/local/lib64/dectris-neggia.so ]; then
-    echo LIB=/usr/local/lib64/dectris-neggia.so >> XDS.INP
-    echo LIB= line was written to XDS.INP
+  if [ "$DLS" == 0 ] ; then
+    if [ -e /usr/local/lib64/dectris-neggia.so ]; then
+      echo LIB=/usr/local/lib64/dectris-neggia.so >> XDS.INP
+      echo LIB= line was written to XDS.INP
+    else
+      echo !LIB=/usr/local/lib64/dectris-neggia.so >> XDS.INP
+      echo /usr/local/lib64/dectris-neggia.so was not found - specify location manually!
+    fi
   else
-    echo !LIB=/usr/local/lib64/dectris-neggia.so >> XDS.INP
-    echo /usr/local/lib64/dectris-neggia.so was not found - specify location manually!
-  fi
+    if [ -e /usr/local/lib64/durin-plugin.so ]; then
+      echo LIB=/usr/local/lib64/durin-plugin.so >> XDS.INP
+      echo LIB= line was written to XDS.INP
+    else
+      echo !LIB=/usr/local/lib64/durin-plugin.so >> XDS.INP
+      echo /usr/local/lib64/durin-plugin.so was not found - specify location manually!
+    fi
+  fi 
 fi 
 
 if [ "$DET" == "raxis" -o "$dtrek_det" == "raxis" ]; then
