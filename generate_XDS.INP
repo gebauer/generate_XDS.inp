@@ -95,7 +95,8 @@
 # revision 0.90 . KD 25/10/2019 add OLDMAR detector type. Tested w/ SBGrid data set 6. Anomalous signal may have wrong hand!
 # revision 0.91 . KD 16/01/2020 Allow negative starting angle for Eiger (found -33 at SLS !).
 # revision 0.92 . KD 27/02/2020 read *_master.h5 from Diamond Light Source
-REVISION="0.92 (27-Feb-2020)"
+# revision 0.93 . KD 13/03/2020 print out 2theta for MarCCD (DETECTOR_*_AXIS can be derived from this)
+REVISION="0.93 (12-Mar-2020)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -238,6 +239,7 @@ if [ "$DET" == "XXX" ]; then
 # find parameters of first frame
 elif [ "$DET" == "mccd" ]; then 
   echo Data from a MarCCD detector
+# http://www.sb.fsu.edu/~xray/Manuals/marCCD165header.html has header information
                                   
   DETECTOR="CCDCHESS MINIMUM_VALID_PIXEL_VALUE= 1 OVERLOAD= 65500"
   SENSOR_THICKNESS=0.01                                           
@@ -273,6 +275,12 @@ elif [ "$DET" == "mccd" ]; then
   let SKIP=1720
   DETECTOR_DISTANCE=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')
   DETECTOR_DISTANCE=`echo "scale=3; $DETECTOR_DISTANCE/1000" | bc -l`                                     
+
+# Mar 12, 2020 KD
+  let SKIP=1724
+  TWOTHETA=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}')
+  TWOTHETA=`echo "scale=3; $TWOTHETA/1000" | bc -l`
+  echo 2THETA= $TWOTHETA
 
   let SKIP=1024+256+128+256+44
   STARTING_ANGLE=$(od -t dI -j $SKIP -N 4 tmp2 | head -1 | awk '{print $2}') 
