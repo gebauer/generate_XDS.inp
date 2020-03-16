@@ -96,7 +96,8 @@
 # revision 0.91 . KD 16/01/2020 Allow negative starting angle for Eiger (found -33 at SLS !).
 # revision 0.92 . KD 27/02/2020 read *_master.h5 from Diamond Light Source
 # revision 0.93 . KD 13/03/2020 print out 2theta for MarCCD (DETECTOR_*_AXIS can be derived from this)
-REVISION="0.93 (12-Mar-2020)"
+# revision 0.94 . KD 16/03/2020 bugfix for Bruker-cbf to make bc accept e.g. 3.1e-005 by using awk printf "%.5f" instead of awk print 
+REVISION="0.94 (16-Mar-2020)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -733,11 +734,12 @@ elif [ "$DET" == "Bruker-cbf" ]; then
  DETECTOR_DISTANCE=`grep "0 0 ? ? ?" tmp2 | awk '/DX /{print $2}'` 
 
  X_RAY_WAVELENGTH=`awk '/diffrn_radiation_wavelength.wavelength/{print $2}' tmp2` 
- OMEGA=`awk '/OMEGA \? \? \?/{print $5}' tmp2`
- DELTAOMEGA=`awk '/OMEGA \? \? \?/{print $6}' tmp2`
- PHI=`awk '/PHI \? \? \?/{print $5}' tmp2`
- DELTAPHI=`awk '/PHI \? \? \?/{printf "%5.4f",$6}' tmp2`
- KAPPA=`awk '/CHI \? \? \?/{print $5}' tmp2`
+# fix 16.3.20: instead of print, use printf "%.5f", because bc does not accept e.g. 3.1e-005
+ OMEGA=`awk '/OMEGA \? \? \?/{printf "%.5f",$5}' tmp2`
+ DELTAOMEGA=`awk '/OMEGA \? \? \?/{printf "%.5f",$6}' tmp2`
+ PHI=`awk '/PHI \? \? \?/{printf "%.5f",$5}' tmp2`
+ DELTAPHI=`awk '/PHI \? \? \?/{printf "%.5f",$6}' tmp2`
+ KAPPA=`awk '/CHI \? \? \?/{printf "%.5f",$5}' tmp2`
 # echo OMEGA DELTAOMEGA PHI DELTAPHI KAPPA= $OMEGA $DELTAOMEGA $PHI $DELTAPHI $KAPPA
 
 # test whether the absolute value of deltaphi is > absolute value of deltaomega
