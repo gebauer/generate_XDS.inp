@@ -98,7 +98,8 @@
 # revision 0.93 . KD 13/03/2020 print out 2theta for MarCCD (DETECTOR_*_AXIS can be derived from this)
 # revision 0.94 . KD 16/03/2020 bugfix for Bruker-cbf to make bc accept e.g. 3.1e-005 by using awk printf "%.5f" instead of awk print 
 # revision 0.95 . KD 29/07/2020 fix DLS Eiger HDF5 variant OSCILLATION_RANGE, STARTING_ANGLE. Attention: DLS Eiger variant needs h5dump 1.10 for OVERLOAD!
-REVISION="0.95 (29-Jul-2020)"
+# revision 0.96 . KD 03/10/2020 make script echo detector serial number if inverted ROTATION_AXIS is detected. Suspect APS PILATUS3 6M, S/N 60-0137 inverted.
+REVISION="0.96 (3-Oct-2020)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -263,6 +264,7 @@ elif [ "$DET" == "mccd" ]; then
   DET_SN=`grep "Detector Serial Number =" tmp2 | sed "s/Detector Serial Number = //"`
   if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
     REVERSE_PHI="yes"
+    echo inverted ROTATION_AXIS since Detector Serial Number is "${DET_SN}"
   fi
 
   # offsets are documented; values can be found in mccd_xdsparams.pl script
@@ -421,6 +423,7 @@ elif [ "$DET" == "adsc" ]; then
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
         REVERSE_PHI="yes"
+        echo inverted ROTATION_AXIS since detector serial number is ${DET_SN}
       fi
 
       # find DETECTOR_DISTANCE and OSCILLATION_RANGE:                                                                                
@@ -497,6 +500,7 @@ PILATUS3 6M, S/N 60-0123
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
         REVERSE_PHI="yes"
+        echo inverted ROTATION_AXIS since detector serial number is ${DET_SN}
       fi
       if [ "$DET_SN" == "PILATUS XXX, S/N XX-XXX" ] ; then
         REVERSE_PHI="yes"
@@ -507,9 +511,10 @@ PILATUS3 6M, S/N 60-0123
       if [ "$DET_SN" == "PILATUS3 6M, S/N 60-0119" ] ; then
         if grep -q "Oscillation_axis X.CW +SLOW" tmp2 ; then
           rotation_axis="0 -1 0"
+          echo ROTATION_AXIS="0 -1 0" at Diamond I24
         fi
       fi
-# insert similar code for Petra P14 here
+# FIXME: insert similar code for Petra P14 here
 
 elif [ "$DET" == "eiger" ]; then
 # find out if HDF5 from Diamond (DLS=1) or Dectris (DLS=0)
@@ -517,6 +522,7 @@ elif [ "$DET" == "eiger" ]; then
   OVERLOAD=`h5dump -d "/entry/instrument/detector/detectorSpecific/countrate_correction_count_cutoff" $FIRSTFRAME 2>/dev/null` || DLS=1 
   if [ "$DLS" == 1 ]; then
     echo Eiger HDF5 from Diamond
+# unfortunately h5dump 1.10 is required to get this right for the DLS .h5 files. This version is available at DLS but usually not elsewhere
     OVERLOAD=`h5dump -d "/entry/instrument/detector/saturation_value" $FIRSTFRAME | awk '/\(0\):/{print $2}'`
   # v0.95: fix the next 2 lines by taking care of negative values with the \- , and stop after first "(0)"
     OSCILLATION_RANGE=`h5dump -d "/entry/data/omega" $FIRSTFRAME | awk '/\(0\): [\-0-9]/{print $3-$2;exit}'`
