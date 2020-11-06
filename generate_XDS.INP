@@ -100,7 +100,8 @@
 # revision 0.95 . KD 29/07/2020 fix DLS Eiger HDF5 variant OSCILLATION_RANGE, STARTING_ANGLE. Attention: DLS Eiger variant needs h5dump 1.10 for OVERLOAD!
 # revision 0.96 . KD 03/10/2020 make script echo detector serial number if inverted ROTATION_AXIS is detected.
 # revision 0.97 . KD 19/10/2020 add UNTRUSTED_RECTANGLEs for Eiger2 (which has a few pixels less than Eiger (thanks to Andreas Förster)
-REVISION="0.97 (19-Oct-2020)"
+# revision 0.98 . Thomas Hauß (HZB) 06/11/2020 switch Python print syntax to Python3
+REVISION="0.98 (06-Nov-2020)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -573,20 +574,29 @@ elif [ "$DET" == "raxis" ]; then
   DETECTOR="RAXIS MINIMUM_VALID_PIXEL_VALUE=0  OVERLOAD=2000000"
   #let SKIP=768
   #NX=$(od -t x -j $SKIP -N 4 $FIRSTFRAME |awk 'NR==1{print toupper($2)}'|perl -nle '@array= $_ =~/.{2}/g; print "ibase=16;obase=A;".join("",reverse @array)'|bc)
-  NX=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(768);print "%.4d"%struct.unpack(">i",f.read(4))')
-  NY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(772);print "%.4d"%struct.unpack(">i",f.read(4))')
+!  NX=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(768);print "%.4d"%struct.unpack(">i",f.read(4))')
+!  NY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(772);print "%.4d"%struct.unpack(">i",f.read(4))')
+  NX=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(768);print("%.4d"%struct.unpack(">i",f.read(4)))')
+  NY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(772);print("%.4d"%struct.unpack(">i",f.read(4)))')
 
-  DETECTOR_DISTANCE=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(344);print "-%.4f"%struct.unpack(">f",f.read(4))')
+!  DETECTOR_DISTANCE=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(344);print "-%.4f"%struct.unpack(">f",f.read(4))')
+  DETECTOR_DISTANCE=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(344);print("-%.4f"%struct.unpack(">f",f.read(4)))')
 
-  ORGX=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(540);print "%.4f"%struct.unpack(">f",f.read(4))')
-  ORGY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(544);print "%.4f"%struct.unpack(">f",f.read(4))')
+!  ORGX=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(540);print "%.4f"%struct.unpack(">f",f.read(4))')
+!  ORGY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(544);print "%.4f"%struct.unpack(">f",f.read(4))')
+  ORGX=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(540);print("%.4f"%struct.unpack(">f",f.read(4)))')
+  ORGY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(544);print("%.4f"%struct.unpack(">f",f.read(4)))')
 
-  OSCILLATION_RANGE=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(524);phis,phie=struct.unpack(">ff",f.read(8));print "%.4f"%(phie-phis)')
+!  OSCILLATION_RANGE=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(524);phis,phie=struct.unpack(">ff",f.read(8));print "%.4f"%(phie-phis)')
+  OSCILLATION_RANGE=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(524);phis,phie=struct.unpack(">ff",f.read(8));print("%.4f"%(phie-phis))')
 
-  QX=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(776);print "%.6f"%struct.unpack(">f",f.read(4))')
-  QY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(780);print "%.6f"%struct.unpack(">f",f.read(4))')
+!  QX=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(776);print "%.6f"%struct.unpack(">f",f.read(4))')
+!  QY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(780);print "%.6f"%struct.unpack(">f",f.read(4))')
+  QX=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(776);print("%.6f"%struct.unpack(">f",f.read(4)))')
+  QY=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(780);print("%.6f"%struct.unpack(">f",f.read(4)))')
 
-  X_RAY_WAVELENGTH=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(292);print "%.6f"%struct.unpack(">f",f.read(4))')
+!  X_RAY_WAVELENGTH=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(292);print "%.6f"%struct.unpack(">f",f.read(4))')
+  X_RAY_WAVELENGTH=$(python -c 'import struct; f=open("'$FIRSTFRAME'","rb");f.seek(292);print("%.6f"%struct.unpack(">f",f.read(4)))')
 
 elif [ "$DET" == "dtrek" ]; then
   echo "Data from a RAXIS or Saturn or Pilatus detector with dTREK format"
