@@ -101,7 +101,8 @@
 # revision 0.96 . KD 03/10/2020 make script echo detector serial number if inverted ROTATION_AXIS is detected.
 # revision 0.97 . KD 19/10/2020 add UNTRUSTED_RECTANGLEs for Eiger2 (which has a few pixels less than Eiger (thanks to Andreas Förster)
 # revision 0.98 . Thomas Hauß (HZB) 06/11/2020 switch Python print syntax to Python3
-REVISION="0.98 (06-Nov-2020)"
+# revision 0.99 . Aaron Finke (CHESS) add ROTATION_AXIS=-1 0 0 for EIGER2 16M detector at MX beamline ID7B2 (CHESS)
+REVISION="0.99 (07-Nov-2020)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -524,7 +525,7 @@ elif [ "$DET" == "eiger" ]; then
   OVERLOAD=`h5dump -d "/entry/instrument/detector/detectorSpecific/countrate_correction_count_cutoff" $FIRSTFRAME 2>/dev/null` || DLS=1 
   if [ "$DLS" == 1 ]; then
     echo Eiger HDF5 from Diamond
-# unfortunately h5dump 1.10 is required to get this right for the DLS .h5 files. This version is available at DLS but usually not elsewhere
+# unfortunately h5dump 1.10 is required to get this right for the DLS .h5 files. This version is available at DLS but maybe not elsewhere
     OVERLOAD=`h5dump -d "/entry/instrument/detector/saturation_value" $FIRSTFRAME | awk '/\(0\):/{print $2}'`
   # v0.95: fix the next 2 lines by taking care of negative values with the \- , and stop after first "(0)"
     OSCILLATION_RANGE=`h5dump -d "/entry/data/omega" $FIRSTFRAME | awk '/\(0\): [\-0-9]/{print $3-$2;exit}'`
@@ -540,11 +541,11 @@ elif [ "$DET" == "eiger" ]; then
     STARTING_ANGLE=`h5dump -d "/entry/sample/goniometer/omega_start" $FIRSTFRAME | awk '/\(0\): [\-0-9]/{print $2}'`
   # If rotation vector set (NeXus)
     rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME 2>/dev/null | grep "(0):" | sed -e "s/^.*://; s/,//g"`
-  # Eiger 16M SSRF BL17U1 
+  # Eiger 16M SSRF BL17U1 has S/N E-32-0111;  EIGER2 16M CHESS ID7B2 has S/N E-32-0123 (A. Finke 2020-11-07) v0.99
     SN=`h5dump -d "/entry/instrument/detector/detector_number" $FIRSTFRAME | awk '/\(0\): /{print $2}' | sed s/\"//g`
-    if [ "$SN" == "E-32-0111" ]; then
+    if [ "$SN" == "E-32-0111" ] || [ "$SN" == "E-32-0123" ]; then
       rotation_axis="-1 0 0"
-      echo SSRF BL17U1 with inverted rotation axis
+      echo SSRF BL17U1 or CHESS ID7B2 with inverted rotation axis
     fi 
   fi
   DETECTOR="EIGER MINIMUM_VALID_PIXEL_VALUE=0 OVERLOAD= $OVERLOAD"
