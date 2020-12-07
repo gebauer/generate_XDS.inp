@@ -103,7 +103,8 @@
 # revision 0.98 . Thomas Hauß (HZB) 06/11/2020 switch Python print syntax to Python3
 # revision 0.99 . Aaron Finke (CHESS) 07/11/2020 add ROTATION_AXIS=-1 0 0 for EIGER2 16M detector at MX beamline ID7B2 (CHESS)
 # revision 1.00 . Gleb Bourenkov 10/11/2020 add ROTATION_AXIS=0 -1 0 for beamline P14 (EMBL Hamburg) detectors Eiger 16M S/N E-32-0107; previously Eiger 4M S/N E-08-0107 and PILATUS 6M-F, S/N 60-0115-F
-REVISION="1.00 (10-Nov-2020)"
+# revision 1.01 . KD 07/12/2020 ROTATION_AXIS=0 -1 0 for Pilatus3 2M, S/N 24-0118 at ID23-2 (http://www.globalphasing.com/autoproc/wiki/index.cgi?BeamlineSettings)
+REVISION="1.01 (07-Dec-2020)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -522,6 +523,11 @@ PILATUS3 6M, S/N 60-0123
       if [ "$DET_SN" == "Dectris Eiger 16M, E-32-0107" -o "$DET_SN" == "Dectris Eiger 4M, E-08-0107" -o "$DET_SN" == "PILATUS 6M-F, S/N 60-0115-F" ] ; then
         rotation_axis="0 -1 0"
         echo ROTATION_AXIS="0 -1 0" at PETRA P14
+      fi
+# ESRF ID23-2:
+      if [ "$DET_SN" == "PILATUS3 2M, S/N 24-0118, ESRF ID23" ] ; then
+        rotation_axis="0 -1 0"
+        echo ROTATION_AXIS="0 -1 0" at ESRF ID23-2
       fi
 
 elif [ "$DET" == "eiger" ]; then
