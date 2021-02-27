@@ -104,7 +104,8 @@
 # revision 0.99 . Aaron Finke (CHESS) 07/11/2020 add ROTATION_AXIS=-1 0 0 for EIGER2 16M detector at MX beamline ID7B2 (CHESS)
 # revision 1.00 . Gleb Bourenkov 10/11/2020 add ROTATION_AXIS=0 -1 0 for beamline P14 (EMBL Hamburg) detectors Eiger 16M S/N E-32-0107; previously Eiger 4M S/N E-08-0107 and PILATUS 6M-F, S/N 60-0115-F
 # revision 1.01 . KD 07/12/2020 ROTATION_AXIS=0 -1 0 for Pilatus3 2M, S/N 24-0118 at ID23-2 (http://www.globalphasing.com/autoproc/wiki/index.cgi?BeamlineSettings)
-REVISION="1.01 (07-Dec-2020)"
+# revision 1.02 . KD 11/01/2021 recognize mar555 detector as mar345 (thanks to Thomas Hauß, HZB) 
+REVISION="1.02 (11-Jan-2021)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -228,7 +229,9 @@ if [ "$is_h5" == 0 ]; then
  head -n1 tmp2 | grep -q "^R-AXIS" && DET=raxis
  grep -q "^SOURCE_WAVELENGTH= *1" tmp2 && DET=dtrek
  grep -q BEAM_CENTER_X tmp2       && DET=adsc                                 
- grep -q mar345 tmp2		 && DET=MAR345     
+ grep -q mar345 tmp2		 && DET=MAR345
+ # rev. 1.02: in one case, mar555 data could be processed pretending it is mar345, so:
+ grep -q mar555 tmp2		 && DET=MAR345
  grep -q BRUKER tmp2 && grep -q CBF tmp2  && DET=Bruker-cbf   
  grep -q CMOS1 tmp2 && DET=adsc-CMOS1   
  grep -q MARCONTROL tmp2 && DET=OLDMAR                    
@@ -703,7 +706,8 @@ elif [ "$DET" == "MAR345" ]; then
  echo  "Data from a Mar345 image plate detector"
  DETECTOR="MAR345  MINIMUM_VALID_PIXEL_VALUE=0  OVERLOAD=130000"
  NX=`awk '/FORMAT/{print $2}' tmp2`
- NY=$NX
+# next line is rev 1.02 (previously NY= $NX):
+ NY=`awk -v NX=$NX '/FORMAT/{print $4/NX}' tmp2`
  QX=`awk '/PIXEL/{print $3/1000.}' tmp2`
  QY=`awk '/PIXEL/{print $5/1000.}' tmp2`
  if grep -q 'CENTER' tmp2; then
@@ -950,12 +954,12 @@ NUMBER_OF_PROFILE_GRID_POINTS_ALONG_ALPHA/BETA=13 ! Default is 9 - Increasing ma
 NUMBER_OF_PROFILE_GRID_POINTS_ALONG_GAMMA=13      ! accuracy, particularly if finely-sliced on phi, 
 !                                                   and does not seem to have any downsides. 
 eof
-  if [ $NX == "1028"  -a $NY == "1062" ]; then
+  if [ "$NX" == "1028"  -a "$NY" == "1062" ]; then
 # Eiger2 1M ; v0.97 numbers from Andreas Förster
     cat >> XDS.INP << eof
 UNTRUSTED_RECTANGLE=    0 1029    512  551
 eof
-  elif [ $NX == "1475" ]; then
+  elif [ "$NX" == "1475" ]; then
     if ! grep -q Flat_field tmp2 ; then
     cat >> XDS.INP << eof
 ! the following specifications are for a detector _without_ proper
@@ -988,7 +992,7 @@ UNTRUSTED_RECTANGLE=   0 1476  1255 1273
 UNTRUSTED_RECTANGLE=   0 1476  1467 1485
 eof
     fi
-  elif [ $NX == "2068"  -a $NY == "2162" ]; then
+  elif [ "$NX" == "2068"  -a "$NY" == "2162" ]; then
 # Eiger2 4M ; v0.97 numbers from Andreas Förster
     cat >> XDS.INP << eof
 !EXCLUSION OF VERTICAL DEAD AREAS OF THE EIGER2 4M DETECTOR
@@ -998,7 +1002,7 @@ eof
  UNTRUSTED_RECTANGLE=    0 2069   1062 1101
  UNTRUSTED_RECTANGLE=    0 2069   1612 1651
 eof
-  elif [ $NX == "2463" ]; then
+  elif [ "$NX" == "2463" ]; then
 # Pilatus 6M
 # FIXME: here we could test if a Flat_field correction was applied like we do for 2M
     cat >> XDS.INP << eof
@@ -1018,7 +1022,7 @@ UNTRUSTED_RECTANGLE=   0 2464  1891 1909
 UNTRUSTED_RECTANGLE=   0 2464  2103 2121
 UNTRUSTED_RECTANGLE=   0 2464  2315 2333
 eof
-  elif [ $NX == "3110"  -a $NY == "3269" ]; then
+  elif [ "$NX" == "3110"  -a "$NY" == "3269" ]; then
 # Eiger 9M
     cat >> XDS.INP << eof
 !EXCLUSION OF VERTICAL DEAD AREAS OF THE EIGER 9M DETECTOR
@@ -1031,7 +1035,7 @@ UNTRUSTED_RECTANGLE= 0 3110 1615 1655
 UNTRUSTED_RECTANGLE= 0 3110 2166 2206
 UNTRUSTED_RECTANGLE= 0 3110 2717 2757
 eof
-  elif [ $NX == "3108"  -a $NY == "3262" ]; then
+  elif [ "$NX" == "3108"  -a "$NY" == "3262" ]; then
 # Eiger2 9M ; v0.97 numbers from Andreas Förster
     cat >> XDS.INP << eof
 !EXCLUSION OF VERTICAL DEAD AREAS OF THE EIGER2 9M DETECTOR
@@ -1044,7 +1048,7 @@ UNTRUSTED_RECTANGLE=    0 3109   1612 1651
 UNTRUSTED_RECTANGLE=    0 3109   2162 2201
 UNTRUSTED_RECTANGLE=    0 3109   2712 2751
 eof
-  elif [ $NX == "4150" -a $NY == "4371" ]; then
+  elif [ "$NX" == "4150" -a "$NY" == "4371" ]; then
 # Eiger 16M
     cat >> XDS.INP << eof
 !EXCLUSION OF HORIZONTAL DEAD AREAS OF THE EIGER 16M DETECTOR + ONE PIXEL ON EACH SIDE
@@ -1060,7 +1064,7 @@ eof
  UNTRUSTED_RECTANGLE= 2069 2082      0 4371 
  UNTRUSTED_RECTANGLE= 3109 3122      0 4371
 eof
-  elif [ $NX == "4148" -a $NY == "4362" ]; then
+  elif [ "$NX" == "4148" -a "$NY" == "4362" ]; then
 # Eiger2 16M ; v0.97 numbers from Andreas Förster
     cat >> XDS.INP << eof
 !EXCLUSION OF HORIZONTAL DEAD AREAS OF THE EIGER2 16M DETECTOR
