@@ -105,7 +105,8 @@
 # revision 1.00 . Gleb Bourenkov 10/11/2020 add ROTATION_AXIS=0 -1 0 for beamline P14 (EMBL Hamburg) detectors Eiger 16M S/N E-32-0107; previously Eiger 4M S/N E-08-0107 and PILATUS 6M-F, S/N 60-0115-F
 # revision 1.01 . KD 07/12/2020 ROTATION_AXIS=0 -1 0 for Pilatus3 2M, S/N 24-0118 at ID23-2 (http://www.globalphasing.com/autoproc/wiki/index.cgi?BeamlineSettings)
 # revision 1.02 . KD 11/01/2021 recognize mar555 detector as mar345 (thanks to Thomas Hauß, HZB) 
-REVISION="1.02 (11-Jan-2021)"
+# revision 1.03 . Feng YU 18/7/2021 fix/expand information about Shanghai Synchrotron Radiation Facility (SSRF)
+REVISION="1.03 (22-Jul-2021)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -553,14 +554,71 @@ elif [ "$DET" == "eiger" ]; then
     OSCILLATION_RANGE=`h5dump -d "/entry/sample/goniometer/omega_range_average" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
   # STARTING_ANGLE:  the \- was introduced in version 0.91 to allow negative values :
     STARTING_ANGLE=`h5dump -d "/entry/sample/goniometer/omega_start" $FIRSTFRAME | awk '/\(0\): [\-0-9]/{print $2}'`
+  # /entry/sample/goniometer/omega_start is missing in some eiger2 detectors (e.g. Eiger2 9M with fw version release-2020.2.1 and SIMPLON API 1.8) (Feng YU 2021-07-18)
+    if [ "$STARTING_ANGLE" == "" ]; then
+		  echo "/entry/sample/goniometer/omega_start not found, try /entry/sample/goniometer/omega"
+		  STARTING_ANGLE=`h5dump -d /entry/sample/goniometer/omega $FIRSTFRAME | grep "(0):" | head -n 1 | awk '{print $2}' | sed -e "s/,//g"`
+    fi
+    echo "STARTING_ANGLE=$STARTING_ANGLE"
   # If rotation vector set (NeXus)
     rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME 2>/dev/null | grep "(0):" | sed -e "s/^.*://; s/,//g"`
-  # Eiger 16M SSRF BL17U1 has S/N E-32-0111;  EIGER2 16M CHESS ID7B2 has S/N E-32-0123 (A. Finke 2020-11-07) v0.99
+  # EIGER2 16M CHESS ID7B2 has S/N E-32-0123 (A. Finke 2020-11-07) v0.99
     SN=`h5dump -d "/entry/instrument/detector/detector_number" $FIRSTFRAME | awk '/\(0\): /{print $2}' | sed s/\"//g`
-    if [ "$SN" == "E-32-0111" ] || [ "$SN" == "E-32-0123" ]; then
+    if [ "$SN" == "E-32-0123" ]; then
       rotation_axis="-1 0 0"
-      echo SSRF BL17U1 or CHESS ID7B2 with inverted rotation axis
-    fi 
+      echo CHESS ID7B2 with inverted rotation axis
+    fi
+  # SSRF BL17U1 and SSRF BL10U2 (Feng YU 2021-07-18)
+  # Eiger X 16M (S/N E-32-0111) was installed at SSRF BL17U1 from Oct 2017 to Feb 2021. After Feb 2021, it was moved back to SSRF BL10U2.
+	# 2021-02-01 00:00:00 CST time stamp is 1612108800
+    if [ "$SN" == "E-32-0111" ]; then
+      collection_time=`h5dump -d "/entry/instrument/detector/detectorSpecific/data_collection_date" $FIRSTFRAME | grep "(0):" | awk '{print $2}' | sed -e "s/\.\(.*\)/CST/g; s/\"//g"`
+      if [ `uname -s` == "Darwin" ]; then
+        collection_timestamp=`date -j -f "%Y-%m-%dT%H:%M:%S%Z" $collection_time +%s`
+      elif [ `uname -s` == "Linux" ]; then
+        collection_timestamp=`date -d $collection_time +%s`
+      else
+        collection_timestamp=0
+      fi
+      if [ $collection_timestamp -eq 0 ]; then
+        is_rotation_axis_set=1
+        rotation_axis=`h5dump -d "/SSRF/RotationAxis" $FIRSTFRAME 2>/dev/null || is_rotation_axis_set=0`
+        if [ "$is_rotation_axis_set" == "1" ]; then
+          rotation_axis=`h5dump -d "/SSRF/RotationAxis" $FIRSTFRAME | grep "(0):" | sed -e "s/^.*://; s/,//g"`
+          echo "The rotation axis of SSRF BL10U2 (Eiger X 16M) is $rotation_axis"
+        else
+          rotation_axis="-1 0 0    ! Cannot determine rotation axis. SSRF BL17U1: -1 0 0; SSRF BL02U1: 0 -1 0"
+        fi
+      elif [ $collection_timestamp -ge 0 ] && [ $collection_timestamp -le 1612108800 ]; then
+        # SSRF BL17U1
+        rotation_axis="-1 0 0"
+        echo "SSRF BL17U1 (Eiger X 16M) with inverted rotation axis"
+      else
+        # SSRF BL10U2
+        is_rotation_axis_set=1
+        rotation_axis=`h5dump -d "/SSRF/RotationAxis" $FIRSTFRAME 2>/dev/null || is_rotation_axis_set=0`
+        if [ "$is_rotation_axis_set" == "1" ]; then
+          rotation_axis=`h5dump -d "/SSRF/RotationAxis" $FIRSTFRAME | grep "(0):" | sed -e "s/^.*://; s/,//g"`
+          echo "The rotation axis of SSRF BL10U2 (Eiger X 16M) is $rotation_axis"
+        else
+          rotation_axis="0 -1 0"
+          echo "SSRF BL10U2 (Eiger X 16M) with vertical rotation axis"
+        fi
+      fi
+    fi
+  # SSRF BL02U1 (Feng YU 2021-07-18)
+  # EIGER2 S 9M SSRF BL02U1 has S/N E-18-0121
+    if [ "$SN" == "E-18-0121" ]; then
+      is_rotation_axis_set=1
+      rotation_axis=`h5dump -d "/SSRF/RotationAxis" $FIRSTFRAME 2>/dev/null || is_rotation_axis_set=0`
+      if [ "$is_rotation_axis_set" == "1" ]; then
+        rotation_axis=`h5dump -d "/SSRF/RotationAxis" $FIRSTFRAME | grep "(0):" | sed -e "s/^.*://; s/,//g"`
+        echo "The rotation axis of SSRF BL02U1 (Eiger2 S 9M) is $rotation_axis"
+      else
+        rotation_axis="1 0 0"
+        echo "SSRF BL02U1 (Eiger2 S 9M) with horizontal rotation axis"
+      fi
+    fi
   fi
   DETECTOR="EIGER MINIMUM_VALID_PIXEL_VALUE=0 OVERLOAD= $OVERLOAD"
   QX=`h5dump -d "/entry/instrument/detector/x_pixel_size" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
@@ -1088,3 +1146,4 @@ echo http://www.mpimf-heidelberg.mpg.de/~kabsch/xds . More documentation in XDSw
 echo After running xds, inspect, using XDS-Viewer, at least the beamstop mask in
 echo BKGPIX.cbf, and the agreement of predicted and observed spots in FRAME.cbf!
 rm -f tmp1 tmp2
+
