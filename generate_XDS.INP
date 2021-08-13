@@ -106,7 +106,8 @@
 # revision 1.01 . KD 07/12/2020 ROTATION_AXIS=0 -1 0 for Pilatus3 2M, S/N 24-0118 at ID23-2 (http://www.globalphasing.com/autoproc/wiki/index.cgi?BeamlineSettings)
 # revision 1.02 . KD 11/01/2021 recognize mar555 detector as mar345 (thanks to Thomas Hauß, HZB) 
 # revision 1.03 . Feng YU 18/7/2021 fix/expand information about Shanghai Synchrotron Radiation Facility (SSRF)
-REVISION="1.03 (22-Jul-2021)"
+# revision 1.04 . Zhipu Luo 13/08/2021 extract ORGX,ORGY for electron diffraction from SMV header if the wavelength value starts with 0.0 
+REVISION="1.04 (13-AUG-2021)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -159,6 +160,7 @@ STARTING_ANGLE=0
 dtrek_det=""
 SEPMIN=7.0
 CLUSTER_RADIUS=3.5
+REFINE_CORRECT="CELL BEAM ORIENTATION AXIS POSITION ! Default is: refine everything"
 
 dname=`echo "$1" | xargs dirname`
 test "${dname}" == "" && dname="."
@@ -235,7 +237,8 @@ if [ "$is_h5" == 0 ]; then
  grep -q mar555 tmp2		 && DET=MAR345
  grep -q BRUKER tmp2 && grep -q CBF tmp2  && DET=Bruker-cbf   
  grep -q CMOS1 tmp2 && DET=adsc-CMOS1   
- grep -q MARCONTROL tmp2 && DET=OLDMAR                    
+ grep -q MARCONTROL tmp2 && DET=OLDMAR  
+ grep -q "WAVELENGTH=0.0" tmp2 && DET=experimental-ED                                     
 else
  h5dump -d "/entry/instrument/detector/description" $FIRSTFRAME | grep -i Eiger > /dev/null && DET=eiger
 fi
@@ -455,7 +458,35 @@ elif [ "$DET" == "adsc-CMOS1" ]; then
   REVERSE_PHI="yes"
   DETECTOR_DISTANCE=`grep ^DISTANCE tmp2 | sed s/DISTANCE=/-/`                                                                     
   OSCILLATION_RANGE=`grep OMEGA_DELTA tmp2 | sed s/OMEGA_DELTA=//`  
-  DIRECTION_OF_DETECTOR_X_AXIS="-1 0 0"                                                                 
+  DIRECTION_OF_DETECTOR_X_AXIS="-1 0 0" 
+                                                                
+elif [ "$DET" == "experimental-ED" ]; then
+  DETECTOR="ADSC MINIMUM_VALID_PIXEL_VALUE= 1 OVERLOAD= 65000  ! OVERLOAD is really unknown "
+  echo --- Electron diffraction data in SMV format!
+  SENSOR_THICKNESS=0.01                                                        
+  sed s/\;// tmp2 > tmp1                                                       
+  mv tmp1 tmp2                                                                 
+  X_RAY_WAVELENGTH=`grep WAVELENGTH tmp2 | head -1 | sed s/WAVELENGTH=//`
+  NX=`grep SIZE1 tmp2 | tail -1 | sed s/SIZE1=//`
+  QX=`grep PIXEL_SIZE tmp2 | sed s/PIXEL_SIZE=//`
+  NY=`grep SIZE2 tmp2 | tail -1 | sed s/SIZE2=//`                                             
+  QY=$QX  
+  BEAM_CENTER_X=`grep BEAM_CENTER_X tmp2 | sed s/BEAM_CENTER_X=//`
+  BEAM_CENTER_Y=`grep BEAM_CENTER_Y tmp2 | sed s/BEAM_CENTER_Y=//` 
+  QXY=`echo "scale=1; $QX*($BEAM_CENTER_X+$BEAM_CENTER_Y)" | bc -l`
+      if [ "$QXY" "<" "$BEAM_CENTER_X" ] ; then
+       ORGX=`echo "scale=2; $BEAM_CENTER_Y/$QX" | bc -l`
+       ORGY=`echo "scale=2; $BEAM_CENTER_X/$QX" | bc -l`
+      else
+       ORGX=`echo "scale=2; $BEAM_CENTER_X/1" | bc -l`
+       ORGY=`echo "scale=2; $BEAM_CENTER_Y/1" | bc -l`
+      fi
+  DETECTOR_DISTANCE=`grep ^DISTANCE tmp2 | sed s/DISTANCE=//`                                                                     
+  OSCILLATION_RANGE=`grep OSC_RANGE tmp2 | sed s/OSC_RANGE=//` 
+  STARTING_ANGLE=`grep OSC_START tmp2 | sed s/OSC_START=//` 
+  echo --- For TIMEPIX detector, please fix ROTATION_AXIS yourself!
+  DIRECTION_OF_DETECTOR_X_AXIS="1 0 0" 
+  REFINE_CORRECT="ORIENTATION CELL AXIS BEAM ! for ED, no POSITION when CELL is refined"
 
 elif [ "$DET" == "pilatus" ]; then
   echo Data from a Pilatus detector                                         
@@ -918,9 +949,8 @@ SEPMIN=$SEPMIN  CLUSTER_RADIUS=$CLUSTER_RADIUS ! 4 and 2 for Pixel Array Detecto
 ! nowadays headers are usually correct so refine POSITION in INTEGRATE but not IDXREF if low to medium resolution
 ! however, if the spots from COLSPOT extend to 2A then POSITION could, and if 1.5A POSITION should be refined
 REFINE(IDXREF)=CELL BEAM ORIENTATION AXIS  ! add POSITION if high resolution, or DETECTOR_DISTANCE inaccurate
-REFINE(INTEGRATE)= POSITION BEAM ORIENTATION ! AXIS CELL . If 1.5A or higher it is ok to refine CELL
-! REFINE(CORRECT)=CELL BEAM ORIENTATION AXIS POSITION ! Default is: refine everything
-
+REFINE(INTEGRATE)= POSITION BEAM ORIENTATION ! AXIS CELL . If 1.5A or higher it is ok to refine CELL (unless electron diffraction)
+REFINE(CORRECT)= $REFINE_CORRECT
 ! parameters specifically for this detector and beamline:
 DETECTOR= $DETECTOR
 SENSOR_THICKNESS= $SENSOR_THICKNESS
