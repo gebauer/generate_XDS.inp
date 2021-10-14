@@ -107,7 +107,8 @@
 # revision 1.02 . KD 11/01/2021 recognize mar555 detector as mar345 (thanks to Thomas Hauß, HZB) 
 # revision 1.03 . Feng YU 18/7/2021 fix/expand information about Shanghai Synchrotron Radiation Facility (SSRF)
 # revision 1.04 . Zhipu Luo 13/08/2021 extract ORGX,ORGY for electron diffraction from SMV header if the wavelength value starts with 0.0 
-REVISION="1.04 (13-AUG-2021)"
+# revision 1.05 . KD specialcase extraction of number of images for BNL detectors E-32-0101 and E-18-0104
+REVISION="1.05 (14-OCT-2021)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -190,6 +191,7 @@ else
  data_first=`cut -b $pos1-$pos2 tmp1 | head -n1 | bc`
  data_last=`cut -b $pos1-$pos2 tmp1 | tail -n1 | bc`
  DATA_RANGE="$data_first $data_last"
+ echo DATA_RANGE=$DATA_RANGE
  
  # set SPOT_RANGE to first half of DATA_RANGE
  data_num=`wc -l tmp1 | awk '{print $1}'`
@@ -201,15 +203,6 @@ fi
 
 FIRSTFRAME=`head -1 tmp1`
 echo $FIRSTFRAME | grep "\.h5$" && is_h5=1 || is_h5=0
-
-if [ "$is_h5" == 1 ]; then
-# nframes=`h5dump -A -g "/entry/data" $FIRSTFRAME | grep "DATASPACE  SIMPLE" | sed -e "s/,.*//" | awk '{a+=$5}END{print a}'`
- nframes=`h5dump -d "/entry/instrument/detector/detectorSpecific/nimages" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
- DATA_RANGE="1 $nframes"
- SPOT_RANGE="1 `echo "scale=0; if (${nframes}<2) 1; if (${nframes}>1) ${nframes}/2"|bc -l`"
-fi
-
-echo DATA_RANGE=$DATA_RANGE
 
 # find out detector type
 DET=XXX              
@@ -566,6 +559,10 @@ PILATUS3 6M, S/N 60-0123
       fi
 
 elif [ "$DET" == "eiger" ]; then
+ nframes=`h5dump -d "/entry/instrument/detector/detectorSpecific/nimages" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
+ DATA_RANGE="1 $nframes"
+ SPOT_RANGE="1 `echo "scale=0; if (${nframes}<2) 1; if (${nframes}>1) ${nframes}/2"|bc -l`"
+ 
 # find out if HDF5 from Diamond (DLS=1) or Dectris (DLS=0)
   DLS=0
   OVERLOAD=`h5dump -d "/entry/instrument/detector/detectorSpecific/countrate_correction_count_cutoff" $FIRSTFRAME 2>/dev/null` || DLS=1 
@@ -650,7 +647,15 @@ elif [ "$DET" == "eiger" ]; then
         echo "SSRF BL02U1 (Eiger2 S 9M) with horizontal rotation axis"
       fi
     fi
+# revision 1.05 specialcase nframes for Eiger detectors at BNL
+    if [ "$SN" == "E-18-0121" -o "$SN" == "E-32-0101" ]; then
+      echo specialcase nframes for Eiger detectors at BNL:
+      nframes=`h5dump -A -g "/entry/data" $FIRSTFRAME | grep "DATASPACE  SIMPLE" | sed -e "s/,.*//" | awk '{a+=$5}END{print a}'`
+      DATA_RANGE="1 $nframes"
+      SPOT_RANGE="1 `echo "scale=0; if (${nframes}<2) 1; if (${nframes}>1) ${nframes}/2"|bc -l`"
+    fi
   fi
+  echo DATA_RANGE=$DATA_RANGE
   DETECTOR="EIGER MINIMUM_VALID_PIXEL_VALUE=0 OVERLOAD= $OVERLOAD"
   QX=`h5dump -d "/entry/instrument/detector/x_pixel_size" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
   QY=`h5dump -d "/entry/instrument/detector/y_pixel_size" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
