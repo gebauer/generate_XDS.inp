@@ -108,7 +108,8 @@
 # revision 1.03 . Feng YU 18/7/2021 fix/expand information about Shanghai Synchrotron Radiation Facility (SSRF)
 # revision 1.04 . Zhipu Luo 13/08/2021 extract ORGX,ORGY for electron diffraction from SMV header if the wavelength value starts with 0.0 
 # revision 1.05 . KD specialcase extraction of number of images for BNL detectors E-32-0101 and E-18-0104
-REVISION="1.05 (14-OCT-2021)"
+# revision 1.06 . KD fix URLs in output. Availability of Apple M1 processor dectris-neggia-Apple-arm64.so . LC_ALL=C .
+REVISION="1.06 (15-OCT-2021)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -132,6 +133,8 @@ if [ "$1" == "help" ] || [ "$1" == "-help" ] || [ "$1" == "-h" ]; then
   echo if the frames are compressed with bzip2, leave out the .bz2 extension!                                    
   exit                                                                                                           
 fi                                                                                                               
+# make sure the locale does not interfere with e.g. awk calculations:
+LC_ALL="C";export LC_ALL
 #                                                                                                                
 # defaults:                                                                                                      
 #       
@@ -970,7 +973,7 @@ if [ "$DET" == "eiger" ] && [ "$is_h5" == 1 ]; then
   if [ "$DLS" == 0 ] ; then
     if [ -e /usr/local/lib64/dectris-neggia.so ]; then
       echo LIB=/usr/local/lib64/dectris-neggia.so >> XDS.INP
-      echo LIB= line was written to XDS.INP
+      echo LIB= line was written to XDS.INP . For Apple ARM64 processors, you must modify the name.
     else
       echo !LIB=/usr/local/lib64/dectris-neggia.so >> XDS.INP
       echo /usr/local/lib64/dectris-neggia.so was not found - specify location manually!
@@ -1176,9 +1179,9 @@ eof
   fi
 fi
 echo XDS.INP is ready for use. The file has only the most important keywords.
-echo Full documentation, including complete detector templates, is at
-echo http://www.mpimf-heidelberg.mpg.de/~kabsch/xds . More documentation in XDSwiki
-echo After running xds, inspect, using XDS-Viewer, at least the beamstop mask in
-echo BKGPIX.cbf, and the agreement of predicted and observed spots in FRAME.cbf!
+echo Full documentation, including complete detector templates, at xds.mr.mpg.de .
+echo More documentation in strucbio.biologie.uni-konstanz.de/xdswiki/index.php .
+echo After running xds, inspect at least the agreement of predicted and observed 
+echo spots in FRAME.cbf!
 rm -f tmp1 tmp2
 
