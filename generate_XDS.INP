@@ -109,7 +109,8 @@
 # revision 1.04 . Zhipu Luo 13/08/2021 extract ORGX,ORGY for electron diffraction from SMV header if the wavelength value starts with 0.0 
 # revision 1.05 . KD specialcase extraction of number of images for BNL detectors E-32-0101 and E-18-0104
 # revision 1.06 . KD fix URLs in output. Availability of Apple M1 processor dectris-neggia-Apple-arm64.so . LC_ALL=C .
-REVISION="1.06 (15-OCT-2021)"
+# revision 1.07 . KD, Thomas Hauß, Gleb Bourenkov. Detector moved from Petra P14 to P13
+REVISION="1.07 (25-OCT-2021)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -499,7 +500,7 @@ elif [ "$DET" == "pilatus" ]; then
   grep -q Pixel_size tmp2 && QY=`awk '/Pixel_size/{print 1000*$5}' tmp2`                                                     
 
       # find SENSOR_THICKNESS:
-      SENSOR_THICKNESS=`grep thickness tmp2 | sed -e s/'Silicon sensor, thickness'// | awk '{print $1*1000}'`
+      SENSOR_THICKNESS=`grep thickness tmp2 | sed -e s/'Si.* sensor, thickness'// | awk '{print $1*1000}'`
       # find X_RAY_WAVELENGTH:                                                                               
       X_RAY_WAVELENGTH=`grep Wavelength tmp2 | sed -e s/Wavelength// -e s/A// | awk '{print $1}'`            
 
@@ -551,9 +552,19 @@ PILATUS3 6M, S/N 60-0123
         fi
       fi
 # PETRA P14: raw data from Eiger are stored as CBF files so this is treated as Pilatus
-      if [ "$DET_SN" == "Dectris Eiger 16M, E-32-0107" -o "$DET_SN" == "Dectris Eiger 4M, E-08-0107" -o "$DET_SN" == "PILATUS 6M-F, S/N 60-0115-F" ] ; then
+      if [ "$DET_SN" == "Dectris Eiger 4M, E-08-0107" -o "$DET_SN" == "PILATUS 6M-F, S/N 60-0115-F" ] ; then
         rotation_axis="0 -1 0"
         echo ROTATION_AXIS="0 -1 0" at PETRA P14
+      fi
+# similarly, Eiger 16M at PETRA P14 until May 22, 2021
+      if [ "$DET_SN" == "Dectris Eiger 16M, E-32-0107" ] ; then
+        egrep -q '^# 2020-|^# 2021-0[1-5]|^# 2021-06-[01]|^# 2021-06-2[01]' tmp2 || isatP13=1
+        if [ "$isatP13" == 1 ] ; then
+          echo using the default ROTATION_AXIS=1 0 0 at PETRA P13
+        else
+          rotation_axis="0 -1 0"
+          echo ROTATION_AXIS="0 -1 0" at PETRA P14
+        fi
       fi
 # ESRF ID23-2:
       if [ "$DET_SN" == "PILATUS3 2M, S/N 24-0118, ESRF ID23" ] ; then
