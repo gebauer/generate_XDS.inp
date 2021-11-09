@@ -105,12 +105,13 @@
 # revision 1.00 . Gleb Bourenkov 10/11/2020 add ROTATION_AXIS=0 -1 0 for beamline P14 (EMBL Hamburg) detectors Eiger 16M S/N E-32-0107; previously Eiger 4M S/N E-08-0107 and PILATUS 6M-F, S/N 60-0115-F
 # revision 1.01 . KD 07/12/2020 ROTATION_AXIS=0 -1 0 for Pilatus3 2M, S/N 24-0118 at ID23-2 (http://www.globalphasing.com/autoproc/wiki/index.cgi?BeamlineSettings)
 # revision 1.02 . KD 11/01/2021 recognize mar555 detector as mar345 (thanks to Thomas Hauß, HZB) 
-# revision 1.03 . Feng YU 18/7/2021 fix/expand information about Shanghai Synchrotron Radiation Facility (SSRF)
+# revision 1.03 . Feng Yu 18/7/2021 fix/expand information about Shanghai Synchrotron Radiation Facility (SSRF)
 # revision 1.04 . Zhipu Luo 13/08/2021 extract ORGX,ORGY for electron diffraction from SMV header if the wavelength value starts with 0.0 
 # revision 1.05 . KD specialcase extraction of number of images for BNL detectors E-32-0101 and E-18-0104
 # revision 1.06 . KD fix URLs in output. Availability of Apple M1 processor dectris-neggia-Apple-arm64.so . LC_ALL=C .
-# revision 1.07 . KD, Thomas Hauß, Gleb Bourenkov. Detector moved from Petra P14 to P13
-REVISION="1.07 (25-OCT-2021)"
+# revision 1.07 . KD, Thomas Hauß, Gleb Bourenkov 25/10/2021. Detector moved from Petra P14 to P13
+# revision 1.08 . KD, Thomas Hauß, Feng Yu 7/11/2021 fix TZ in timestamps for SSRF detectors
+REVISION="1.08 (7-NOV-2021)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -612,11 +613,11 @@ elif [ "$DET" == "eiger" ]; then
     fi
   # SSRF BL17U1 and SSRF BL10U2 (Feng YU 2021-07-18)
   # Eiger X 16M (S/N E-32-0111) was installed at SSRF BL17U1 from Oct 2017 to Feb 2021. After Feb 2021, it was moved back to SSRF BL10U2.
-	# 2021-02-01 00:00:00 CST time stamp is 1612108800
+	# 2021-03-01 00:00:00 time stamp is 1614528000
     if [ "$SN" == "E-32-0111" ]; then
-      collection_time=`h5dump -d "/entry/instrument/detector/detectorSpecific/data_collection_date" $FIRSTFRAME | grep "(0):" | awk '{print $2}' | sed -e "s/\.\(.*\)/CST/g; s/\"//g"`
+      collection_time=`h5dump -d "/entry/instrument/detector/detectorSpecific/data_collection_date" $FIRSTFRAME | grep "(0):" | awk '{print $2}' | sed -e "s/\.\(.*\)//g; s/\"//g"`
       if [ `uname -s` == "Darwin" ]; then
-        collection_timestamp=`date -j -f "%Y-%m-%dT%H:%M:%S%Z" $collection_time +%s`
+        collection_timestamp=`date -j -f "%Y-%m-%dT%H:%M:%S" $collection_time +%s`
       elif [ `uname -s` == "Linux" ]; then
         collection_timestamp=`date -d $collection_time +%s`
       else
@@ -631,7 +632,7 @@ elif [ "$DET" == "eiger" ]; then
         else
           rotation_axis="-1 0 0    ! Cannot determine rotation axis. SSRF BL17U1: -1 0 0; SSRF BL02U1: 0 -1 0"
         fi
-      elif [ $collection_timestamp -ge 0 ] && [ $collection_timestamp -le 1612108800 ]; then
+      elif [ $collection_timestamp -ge 0 ] && [ $collection_timestamp -le 1614528000 ]; then
         # SSRF BL17U1
         rotation_axis="-1 0 0"
         echo "SSRF BL17U1 (Eiger X 16M) with inverted rotation axis"
@@ -662,7 +663,7 @@ elif [ "$DET" == "eiger" ]; then
       fi
     fi
 # revision 1.05 specialcase nframes for Eiger detectors at BNL
-    if [ "$SN" == "E-18-0121" -o "$SN" == "E-32-0101" ]; then
+    if [ "$SN" == "E-18-0104" -o "$SN" == "E-32-0101" ]; then
       echo specialcase nframes for Eiger detectors at BNL:
       nframes=`h5dump -A -g "/entry/data" $FIRSTFRAME | grep "DATASPACE  SIMPLE" | sed -e "s/,.*//" | awk '{a+=$5}END{print a}'`
       DATA_RANGE="1 $nframes"
