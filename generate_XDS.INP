@@ -111,7 +111,8 @@
 # revision 1.06 . KD fix URLs in output. Availability of Apple M1 processor dectris-neggia-Apple-arm64.so . LC_ALL=C .
 # revision 1.07 . KD, Thomas Hauß, Gleb Bourenkov 25/10/2021. Detector moved from Petra P14 to P13
 # revision 1.08 . KD, Thomas Hauß, Feng Yu 7/11/2021 fix TZ in timestamps for SSRF detectors
-REVISION="1.08 (7-NOV-2021)"
+# revision 1.09 . KD, Feng Yu 7/11/2021 fix detector number BNL E-18-0121 to be E-18-0104
+REVISION="1.09 (9-NOV-2021)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
