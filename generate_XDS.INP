@@ -113,7 +113,8 @@
 # revision 1.08 . KD, Thomas Hauß, Feng Yu 7/11/2021 fix TZ in timestamps for SSRF detectors
 # revision 1.09 . KD, Feng Yu 7/11/2021 fix detector number BNL E-18-0121 to be E-18-0104
 # revision 1.10 . KD NeXus header for Eiger
-REVISION="1.10 (7-MAR-2022)"
+# revision 1.11 . KD / Helena Taberman ROTATION_AXIS=-1 0 0 for Eiger .cbf data from Petra P14
+REVISION="1.11 (15-MAR-2022)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -127,7 +128,7 @@ REVISION="1.10 (7-MAR-2022)"
 # - on Mac OS X, the Xcode command line tools (from https://developer.apple.com/download/more/) are needed.                            
 #                                                                                                                
 # notes for debugging of the script:                                                                             
-# - add the -x option to the first line, to see where an error occurs                                            
+# - add the -x option to #!/bin/bash in first line, to see where an error occurs                                            
 # - comment out the removal of tmp1 and tmp2 in the last line                                                    
 #                                                                                                                
 # ====== Start of script ======                                                                                  
@@ -461,7 +462,7 @@ elif [ "$DET" == "adsc-CMOS1" ]; then
   REVERSE_PHI="yes"
   DETECTOR_DISTANCE=`grep ^DISTANCE tmp2 | sed s/DISTANCE=/-/`                                                                     
   OSCILLATION_RANGE=`grep OMEGA_DELTA tmp2 | sed s/OMEGA_DELTA=//`  
-  g_DETECTOR_X_AXIS="-1 0 0" 
+  DETECTOR_X_AXIS="-1 0 0" 
                                                                 
 elif [ "$DET" == "experimental-ED" ]; then
   DETECTOR="ADSC MINIMUM_VALID_PIXEL_VALUE= 1 OVERLOAD= 65000  ! OVERLOAD is really unknown "
@@ -533,6 +534,7 @@ elif [ "$DET" == "pilatus" ]; then
       # Known detectors for reversed-phi at MX2 beamline (Brazilian Synchrotron National Laboratory - LNLS)
       # Known detectors for reversed-phi at CHESS F1 PILATUS3 6M, S/N 60-0127
       # Known detectors for reversed-phi at SSRF BL18U1 (S/N 60-0123) and BL19U1 (S/N XX-XXX) (!; 2019-10-19: staff will fix this)
+      # Known detectors for reversed-phi at Petra P14 (Eiger .cbf files)
       DET_SN=`grep "Detector:" tmp2 | sed "s/^.*Detector: *//"`
       REVERSEPHI_SNs="
 PILATUS3 6M, S/N 60-0125
@@ -540,6 +542,7 @@ PILATUS3 6M, S/N 60-0132
 PILATUS 2M, S/N 24-0109
 PILATUS3 6M, S/N 60-0127
 PILATUS3 6M, S/N 60-0123
+Dectris EIGER2 CdTe 16M, E-32-0129
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
         REVERSE_PHI="yes"
