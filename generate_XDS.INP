@@ -114,7 +114,8 @@
 # revision 1.09 . KD, Feng Yu 7/11/2021 fix detector number BNL E-18-0121 to be E-18-0104
 # revision 1.10 . KD NeXus header for Eiger
 # revision 1.11 . KD / Helena Taberman ROTATION_AXIS=-1 0 0 for Eiger .cbf data from Petra P14
-REVISION="1.11 (15-MAR-2022)"
+# revision 1.12 . KD / Helena Taberman correct rev 1.11 to be 0 -1 0
+REVISION="1.12 (25-MAR-2022)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -122,10 +123,9 @@ REVISION="1.11 (15-MAR-2022)"
 # the ? are wildcards for the frame numbers.                                                                 
 #                                                                                                            
 # known problems:                                                                                            
-# revision 1.10 . KD implement NeXus for Eiger
 # - for ADSC detectors, there are at least three ways to obtain ORGX and ORGY values from the header (see below);
 # - the same might be a problem for MAR headers, too (not sure about this) 
-# - on Mac OS X, the Xcode command line tools (from https://developer.apple.com/download/more/) are needed.                            
+# - on macOS, the "Command Line Tools for Xcode" (from https://developer.apple.com/download/more/) are needed.                            
 #                                                                                                                
 # notes for debugging of the script:                                                                             
 # - add the -x option to #!/bin/bash in first line, to see where an error occurs                                            
@@ -534,7 +534,6 @@ elif [ "$DET" == "pilatus" ]; then
       # Known detectors for reversed-phi at MX2 beamline (Brazilian Synchrotron National Laboratory - LNLS)
       # Known detectors for reversed-phi at CHESS F1 PILATUS3 6M, S/N 60-0127
       # Known detectors for reversed-phi at SSRF BL18U1 (S/N 60-0123) and BL19U1 (S/N XX-XXX) (!; 2019-10-19: staff will fix this)
-      # Known detectors for reversed-phi at Petra P14 (Eiger .cbf files)
       DET_SN=`grep "Detector:" tmp2 | sed "s/^.*Detector: *//"`
       REVERSEPHI_SNs="
 PILATUS3 6M, S/N 60-0125
@@ -542,7 +541,6 @@ PILATUS3 6M, S/N 60-0132
 PILATUS 2M, S/N 24-0109
 PILATUS3 6M, S/N 60-0127
 PILATUS3 6M, S/N 60-0123
-Dectris EIGER2 CdTe 16M, E-32-0129
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
         REVERSE_PHI="yes"
@@ -561,7 +559,8 @@ Dectris EIGER2 CdTe 16M, E-32-0129
         fi
       fi
 # PETRA P14: raw data from Eiger are stored as CBF files so this is treated as Pilatus
-      if [ "$DET_SN" == "Dectris Eiger 4M, E-08-0107" -o "$DET_SN" == "PILATUS 6M-F, S/N 60-0115-F" ] ; then
+      if [ "$DET_SN" == "Dectris Eiger 4M, E-08-0107" -o "$DET_SN" == "PILATUS 6M-F, S/N 60-0115-F" \
+                                        -o "$DET_SN" == "Dectris EIGER2 CdTe 16M, E-32-0129" ] ; then
         rotation_axis="0 -1 0"
         echo ROTATION_AXIS="0 -1 0" at PETRA P14
       fi
@@ -585,6 +584,8 @@ elif [ "$DET" == "eiger" ]; then
  nframes=`h5dump -d "/entry/instrument/detector/detectorSpecific/nimages" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
  DATA_RANGE="1 $nframes"
  SPOT_RANGE="1 `echo "scale=0; if (${nframes}<2) 1; if (${nframes}>1) ${nframes}/2"|bc -l`"
+ SN=`h5dump -d "/entry/instrument/detector/detector_number" $FIRSTFRAME | awk '/\(0\): /{print $2}' | sed s/\"//g`
+ echo detector serial number is $SN
  
 # find out if HDF5 from Diamond (DLS=1) or Dectris (DLS=0)
   DLS=0
@@ -615,7 +616,6 @@ elif [ "$DET" == "eiger" ]; then
   # If rotation axis set (NeXus)
     rotation_axis=`h5dump -a "/entry/sample/transformations/omega/vector" $FIRSTFRAME 2>/dev/null | grep "(0):" | sed -e "s/^.*://; s/,//g"`
   # EIGER2 16M CHESS ID7B2 has S/N E-32-0123 (A. Finke 2020-11-07) v0.99
-    SN=`h5dump -d "/entry/instrument/detector/detector_number" $FIRSTFRAME | awk '/\(0\): /{print $2}' | sed s/\"//g`
     if [ "$SN" == "E-32-0123" ]; then
       rotation_axis="-1 0 0"
       echo CHESS ID7B2 with inverted rotation axis
