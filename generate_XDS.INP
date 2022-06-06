@@ -115,7 +115,8 @@
 # revision 1.10 . KD NeXus header for Eiger
 # revision 1.11 . KD / Helena Taberman ROTATION_AXIS=-1 0 0 for Eiger .cbf data from Petra P14
 # revision 1.12 . KD / Helena Taberman correct rev 1.11 to be 0 -1 0
-REVISION="1.12 (25-MAR-2022)"
+# revision 1.13 . KD variables for /usr/local/lib64/dectris-neggia.so and durin-plugin.so . Remove h5dump error messages. 
+REVISION="1.13 (04-Jun-2022)"
 
 #                                                                                                            
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"                                                       
@@ -606,10 +607,10 @@ elif [ "$DET" == "eiger" ]; then
     OVERLOAD=`h5dump -d "/entry/instrument/detector/detectorSpecific/countrate_correction_count_cutoff" $FIRSTFRAME | awk '/\(0\):/{print $2}'`    
     OSCILLATION_RANGE=`h5dump -d "/entry/sample/goniometer/omega_range_average" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
   # STARTING_ANGLE:  the \- was introduced in version 0.91 to allow negative values :
-    STARTING_ANGLE=`h5dump -d "/entry/sample/goniometer/omega_start" $FIRSTFRAME | awk '/\(0\): [\-0-9]/{print $2}'`
+    STARTING_ANGLE=`h5dump -d "/entry/sample/goniometer/omega_start" $FIRSTFRAME 2>/dev/null | awk '/\(0\): [\-0-9]/{print $2}'`
   # /entry/sample/goniometer/omega_start is missing in some eiger2 detectors (e.g. Eiger2 9M with fw version release-2020.2.1 and SIMPLON API 1.8) (Feng YU 2021-07-18)
     if [ "$STARTING_ANGLE" == "" ]; then
-		  echo "/entry/sample/goniometer/omega_start not found, try /entry/sample/goniometer/omega"
+		  echo "/entry/sample/goniometer/omega_start not found, trying /entry/sample/goniometer/omega"
 		  STARTING_ANGLE=`h5dump -d /entry/sample/goniometer/omega $FIRSTFRAME | grep "(0):" | head -n 1 | awk '{print $2}' | sed -e "s/,//g"`
     fi
     echo "STARTING_ANGLE=$STARTING_ANGLE"
@@ -681,7 +682,7 @@ elif [ "$DET" == "eiger" ]; then
   fi
 # rev 1.10: check for NeXus header. If found, its geometry will overwrite any rotation_axis set until here.
   NeXus=0
-  h5dump -d "/entry/definition" $FIRSTFRAME | grep -q NXmx && NeXus=1
+  h5dump -d "/entry/definition" $FIRSTFRAME 2>/dev/null | grep -q NXmx && NeXus=1
   if [ "$NeXus" == "1" ]; then
     echo NeXus header found. This defines DIRECTION_OF_DETECTOR_X/Y-AXIS and ROTATION_AXIS.
     DIRECTION_OF_DETECTOR_X_AXIS=$(h5dump -d "/entry/instrument/detector/module/fast_pixel_direction" $FIRSTFRAME 2>/dev/null | grep "(0):" | tail -1 | sed -e "s/^.*://; s/,//g")
@@ -989,20 +990,22 @@ eof
 
 if [ "$DET" == "eiger" ] && [ "$is_h5" == 1 ]; then
   if [ "$DLS" == 0 ] ; then
-    if [ -e /usr/local/lib64/dectris-neggia.so ]; then
-      echo LIB=/usr/local/lib64/dectris-neggia.so >> XDS.INP
-      echo LIB= line was written to XDS.INP . For Apple ARM64 processors, you must modify the name.
+    neggia_path=/usr/local/lib64/dectris-neggia.so
+    if [ -e $neggia_path ]; then
+      echo LIB=$neggia_path >> XDS.INP
+      echo "LIB= <dectris-neggia> was written to XDS.INP . Check the path! For Apple M1 processors, modify the name."
     else
       echo !LIB=/usr/local/lib64/dectris-neggia.so >> XDS.INP
-      echo /usr/local/lib64/dectris-neggia.so was not found - specify location manually!
+      echo "dectris-neggia.so not found. Specify LIB=<path-to-dectris-neggia> in XDS.INP & fix your generate_XDS.INP !"
     fi
   else
-    if [ -e /usr/local/lib64/durin-plugin.so ]; then
-      echo LIB=/usr/local/lib64/durin-plugin.so >> XDS.INP
-      echo LIB= line was written to XDS.INP
+    durin_path=/usr/local/lib64/durin-plugin.so
+    if [ -e $durin_path ]; then
+      echo LIB=$durin_path >> XDS.INP
+      echo "LIB= <durin-plugin> was written to XDS.INP . Check the path! For Apple M1 processors, modify the name."
     else
       echo !LIB=/usr/local/lib64/durin-plugin.so >> XDS.INP
-      echo /usr/local/lib64/durin-plugin.so was not found - specify location manually!
+      echo "durin-plugin.so not found. Specify LIB=<path-to-durin-plugin> in XDS.INP & fix your generate_XDS.INP !"
     fi
   fi 
 fi 
