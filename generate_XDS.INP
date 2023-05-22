@@ -125,7 +125,8 @@
 #                       Environment variables to define alternate paths for dectris-neggia.so and durin-plugin.so
 #                       Append detector specific parameters from $HOME/.xds-site/${DET}_${DET_SN}
 #                       Cleaned up section for creating XDS.INP
-REVISION="1.14 (12-Apr-2023)"
+# revision 1.15 . KD 22/05/2023 fix bug with second argument leading to usage message. Updating links.
+REVISION="1.15 (22-May-2023)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -143,8 +144,8 @@ REVISION="1.14 (12-Apr-2023)"
 #
 # ====== Start of script ======
 echo generate_XDS.INP version $REVISION . Obtain the latest version from
-echo http://strucbio.biologie.uni-konstanz.de/xdswiki/index.php/generate_XDS.INP
-if [ "$1" == "help" ] || [ "$1" == "-help" ] || [ "$1" == "-h" ] || [ "$1" == "" ] || [ "$2" != "" ] || ! [[ "$1" =~ \?\?|_master\.h5 ]]; then
+echo http://wiki.uni-konstanz.de/xds/index.php/generate_XDS.INP
+if [ "$1" == "help" ] || [ "$1" == "-help" ] || [ "$1" == "-h" ] || [ "$1" == "" ] || ! [[ "$1" =~ \?\?|_master\.h5 ]]; then
   echo usage: generate_XDS.INP \"/file/system/frms/mydata_1_???.img\"   \(_with_ the quotation marks!\)
   echo If the frames are compressed leave out the extension .bz2, .gz, or .xz!
   echo for .h5 files: generate_XDS.INP /file/system/frms/mydata_1_master.h5
@@ -983,10 +984,10 @@ cat > XDS.INP << eof
 !=============================================================================
 ! written by generate_XDS.INP version $REVISION
 ! For more details on XDS parameters, please check the online documentation at
-!   http://xds.mpimf-heidelberg.mpg.de/html_doc/xds_parameters.html
+!   http://xds.mr.mpg.de/html_doc/xds_parameters.html
 !
 ! Full documentation, including complete detector templates, at xds.mr.mpg.de .
-! More documentation in strucbio.biologie.uni-konstanz.de/xdswiki/index.php .
+! More documentation in wiki.uni-konstanz.de/xds/index.php .
 ! After running xds, inspect at least the agreement of predicted and observed
 ! spots in FRAME.cbf!
 !=============================================================================
@@ -1040,7 +1041,7 @@ DETECTOR= $DETECTOR
 SENSOR_THICKNESS= $SENSOR_THICKNESS
 ! attention CCD detectors: for very high resolution (better than 1A) make sure to specify SILICON
 ! as about 32* what CORRECT.LP suggests (absorption of phosphor is much higher than that of silicon).
-! Better: read the article http://strucbio.biologie.uni-konstanz.de/xdswiki/index.php/SILICON .
+! Better: read the article http://wiki.uni-konstanz.de/xds/index.php/SILICON .
 NX= $NX NY= $NY  QX= $QX  QY= $QY ! to make CORRECT happy if frames are unavailable
 $LIB
 ROTATION_AXIS=$ROTATION_AXIS
@@ -1243,7 +1244,7 @@ else
 fi
 echo XDS.INP is ready for use. The file has only the most important keywords.
 echo Full documentation, including complete detector templates, at xds.mr.mpg.de .
-echo More documentation in strucbio.biologie.uni-konstanz.de/xdswiki/index.php .
+echo More documentation in wiki.uni-konstanz.de/xds/index.php .
 echo After running xds, inspect at least the agreement of predicted and observed
 echo spots in FRAME.cbf!
 rm -f tmp1 tmp2
