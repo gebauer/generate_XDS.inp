@@ -126,7 +126,8 @@
 #                       Append detector specific parameters from $HOME/.xds-site/${DET}_${DET_SN}
 #                       Cleaned up section for creating XDS.INP
 # revision 1.15 . KD 22/05/2023 fix bug with second argument leading to usage message. Updating links.
-REVISION="1.15 (22-May-2023)"
+# revision 1.16 . KD 26/05/2023 fix bug on Mac for Pilatus CBF missing two lines
+REVISION="1.16 (26-May-2023)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -504,6 +505,8 @@ elif [ "$DET" == "experimental-ED" ]; then
 
 elif [ "$DET" == "pilatus" ]; then
   echo Data from a Pilatus detector
+  sed s/#// tmp2 > tmp1                                                     
+  mv tmp1 tmp2 
   OVERLOAD=1048574
   SEPMIN=4
   CLUSTER_RADIUS=2
