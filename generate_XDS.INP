@@ -127,7 +127,8 @@
 #                       Cleaned up section for creating XDS.INP
 # revision 1.15 . KD 22/05/2023 fix bug with second argument leading to usage message. Updating links.
 # revision 1.16 . KD 26/05/2023 fix bug on Mac for Pilatus CBF missing two lines
-REVISION="1.16 (26-May-2023)"
+# revision 1.17 . JMK 31/05/2023 fix sed error for Mac, where \| is not supported
+REVISION="1.17 (31-May-2023)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -243,7 +244,7 @@ echo $FIRSTFRAME | grep -q '\.xz$' && xzcat $FIRSTFRAME > tmp1 && FIRSTFRAME=tmp
 unset IFS
 if [ "$is_h5" == 0 ]; then
  # extract strings from binary file header, removing leading '#' (Pilatus) and trailing ';' (CBF)
- strings $FIRSTFRAME | head -400 | sed 's/^ *#\|; *$//;' >tmp2
+ strings $FIRSTFRAME | head -400 | sed 's/^ *#//;s/; *$//;' >tmp2
  # TODO: whenever FIRSTFRAME is used below, it should be copied to tmp2 (using IFS as above), and tmp2 should be used instead
  # this was done for "mccd", but still has to be done for the "raxis" detector types
  # the reason is that FIRSTFRAME may contain a blank, which makes some commands fail
@@ -505,8 +506,6 @@ elif [ "$DET" == "experimental-ED" ]; then
 
 elif [ "$DET" == "pilatus" ]; then
   echo Data from a Pilatus detector
-  sed s/#// tmp2 > tmp1                                                     
-  mv tmp1 tmp2 
   OVERLOAD=1048574
   SEPMIN=4
   CLUSTER_RADIUS=2
@@ -1217,7 +1216,7 @@ fi
 # Mechanism to append detector-specific parameters without editing this file:
 # TODO: some detectors don't set DET_SN so this is not always unique
 test "$DET_SN" != "" && DET="${DET}_$DET_SN"
-DET=$(echo $DET | sed 's/ /_/g;s/\W//g;')
+DET=$(echo $DET | sed 's/ /_/g;s/[^-_A-Za-z0-9]//g;')
 file="$HOME/.xds-site/$DET"
 if [ -f $file ]; then
   echo Appending site parameters from: $file
@@ -1243,7 +1242,7 @@ else
   echo "Detector specific parameters can be placed in: $file"
   echo "! Detector specific parameters can be placed in:" >> XDS.INP
   echo "!     $file" >> XDS.INP
-  echo "! FRACTION_OF_POLARIZATION, ROTATION_AXIS and TRUDTED_REGION will auto-comment the replaced parameters" >> XDS.INP
+  echo "! FRACTION_OF_POLARIZATION, ROTATION_AXIS and TRUSTED_REGION will auto-comment the replaced parameters" >> XDS.INP
 fi
 echo XDS.INP is ready for use. The file has only the most important keywords.
 echo Full documentation, including complete detector templates, at xds.mr.mpg.de .
