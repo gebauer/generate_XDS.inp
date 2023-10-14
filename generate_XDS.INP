@@ -128,7 +128,8 @@
 # revision 1.15 . KD 22/05/2023 fix bug with second argument leading to usage message. Updating links.
 # revision 1.16 . KD 26/05/2023 fix bug on Mac for Pilatus CBF missing two lines
 # revision 1.17 . JMK 31/05/2023 fix sed error for Mac, where \| is not supported
-REVISION="1.17 (31-May-2023)"
+# revision 1.18 . JMK 19/08/2023 Pilatus 12M support, give help msg if $5 defined (i.e. unquoted frame pattern)
+REVISION="1.18 (19-Aug-2023)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -145,9 +146,9 @@ REVISION="1.17 (31-May-2023)"
 # - comment out the removal of tmp1 and tmp2 in the last line
 #
 # ====== Start of script ======
-echo generate_XDS.INP version $REVISION . Obtain the latest version from
+echo generate_XDS.INP version $REVISION. Obtain the latest version from
 echo http://wiki.uni-konstanz.de/xds/index.php/generate_XDS.INP
-if [ "$1" == "help" ] || [ "$1" == "-help" ] || [ "$1" == "-h" ] || [ "$1" == "" ] || ! [[ "$1" =~ \?\?|_master\.h5 ]]; then
+if [ "$1" == "help" ] || [ "$1" == "-help" ] || [ "$1" == "-h" ] || [ "$1" == "" ] || [ "$5" != "" ] || ! [[ "$1" =~ \?\?|_master\.h5 ]]; then
   echo usage: generate_XDS.INP \"/file/system/frms/mydata_1_???.img\"   \(_with_ the quotation marks!\)
   echo If the frames are compressed leave out the extension .bz2, .gz, or .xz!
   echo for .h5 files: generate_XDS.INP /file/system/frms/mydata_1_master.h5
@@ -721,7 +722,7 @@ elif [ "$DET" == "eiger" ]; then
   CLUSTER_RADIUS=2
 
 elif [ "$DET" == "raxis" ]; then
-  echo Data from a RAXIS detector
+  echo Data from an RAXIS detector
 
   DETECTOR="RAXIS MINIMUM_VALID_PIXEL_VALUE=0  OVERLOAD=2000000"
   #let SKIP=768
@@ -968,20 +969,25 @@ if [ "$DET" == "eiger" ] && [ "$is_h5" == 1 ]; then
   fi
 fi
 if [ "$ROTATION_AXIS" != "" ]; then
-   ROTATION_AXIS="$ROTATION_AXIS  ! only read by IDXREF"
+  ROTATION_AXIS="$ROTATION_AXIS  ! only read by IDXREF"
 elif [ "$REVERSE_PHI" == "no" ]; then
-   ROTATION_AXIS='1 0 0  ! Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8, SSRF need -1 0 0. Diamond ID24 needs 0 -1 0'
+  ROTATION_AXIS='1 0 0  ! Australian Synchrotron, SERCAT ID-22 (?), APS 19-ID (?), ESRF BM30A, SPring-8, SSRF need -1 0 0. Diamond ID24 needs 0 -1 0'
 else
-   ROTATION_AXIS='-1 0 0  ! Default; if this is wrong, please contact author.'
+  ROTATION_AXIS='-1 0 0  ! Default; if this is wrong, please contact author.'
 fi
 
 # Append 2-theta comment if defined
 if (( $(echo "${TWOTHETA}0 != 0"|bc -l) )); then
-    COMMENT_ORGXY="$COMMENT_ORGXY
-! TWOTHETA=$TWOTHETA -- if fails, check DIRECTION_OF_DETECTOR_X-AXIS"
+  COMMENT_ORGXY="$COMMENT_ORGXY
+! TWOTHETA=$TWOTHETA -- information only, do not uncomment. If indexing fails, check DIRECTION_OF_DETECTOR_X-AXIS"
+fi
+
+if [ "$DET" == "pilatus" -a "$NX" == "2463" -a "$NY" == "5071" ]; then
+  SEGMENTED=1
 fi
 
 # now we know almost everything that is required to generate XDS.INP
+# --------- Generate XDS.INP containing all defined parameters ----------
 cat > XDS.INP << eof
 !=============================================================================
 ! written by generate_XDS.INP version $REVISION
@@ -1073,6 +1079,7 @@ cat >> XDS.INP << eof
 ! 1.299 1.296, 1.275 1.274, 1.261 1.259, 1.224 1.222, 1.171 1.168, 1.124 1.122 (compiled by GlobalPhasing)
 
 eof
+# --------- Append additional detector-specific parameters ----------
 if [ "$DET" == "Bruker-cbf" ]; then
   echo "DELPHI=15 ! refine less often than the default of 5" >> XDS.INP
 elif [ "$DET" == "adsc-CMOS1" ]; then
@@ -1085,6 +1092,7 @@ NUMBER_OF_PROFILE_GRID_POINTS_ALONG_ALPHA/BETA=13 ! Default is 9 - Increasing ma
 NUMBER_OF_PROFILE_GRID_POINTS_ALONG_GAMMA=13      ! accuracy, particularly if finely-sliced on phi,
 !                                                   and does not seem to have any downsides.
 eof
+# -------- Append known detector untrusted regions ------------------
   if [ "$NX" == "1028"  -a "$NY" == "1062" ]; then
 # Eiger2 1M ; v0.97 numbers from Andreas Förster
     cat >> XDS.INP << eof
@@ -1094,7 +1102,7 @@ eof
     if ! grep -q Flat_field tmp2 ; then
     cat >> XDS.INP << eof
 ! the following specifications are for a detector _without_ proper
-! flat_field correction; they cut away one additional pixel adjacent
+! flat_field correction; they mask one additional pixel adjacent
 ! to each UNTRUSTED_RECTANGLE
 !EXCLUSION OF VERTICAL DEAD AREAS OF THE PILATUS 2M DETECTOR
 UNTRUSTED_RECTANGLE= 486  496     0 1680
@@ -1133,7 +1141,7 @@ eof
  UNTRUSTED_RECTANGLE=    0 2069   1062 1101
  UNTRUSTED_RECTANGLE=    0 2069   1612 1651
 eof
-  elif [ "$NX" == "2463" ]; then
+  elif [ "$NX" == "2463" -a "$NY" == "2527" ]; then
 # Pilatus 6M
 # FIXME: here we could test if a Flat_field correction was applied like we do for 2M
     cat >> XDS.INP << eof
@@ -1211,38 +1219,53 @@ eof
  UNTRUSTED_RECTANGLE=    0 4149   3262 3301
  UNTRUSTED_RECTANGLE=    0 4149   3812 3851
 eof
+  elif [ "$NX" == "2463" -a "$NY" == "5071" ]; then
+    : # handled above, before writing XDS.INP, untrusted regions come from site file
+  else
+    echo "**** WARNING ****"
+    echo "Unknown Pilatus or Eiger detector, add UNTRUSTED regions and SEGMENT information manually"
   fi
 fi
 # Mechanism to append detector-specific parameters without editing this file:
-# TODO: some detectors don't set DET_SN so this is not always unique
-test "$DET_SN" != "" && DET="${DET}_$DET_SN"
+# NOTE: some detectors don't set DET_SN so this is not always unique
+# If the detector name is present in $DET_SN, then use only $DET_SN
+if [ "$DET_SN" != "" ]; then
+  echo "$DET_SN" | grep -qi "$DET" && DET="$DET_SN" || DET="${DET}_$DET_SN"
+fi
 DET=$(echo $DET | sed 's/ /_/g;s/[^-_A-Za-z0-9]//g;')
-file="$HOME/.xds-site/$DET"
-if [ -f $file ]; then
-  echo Appending site parameters from: $file
-  echo "! Parameters from $file" >> XDS.INP
+site_file="$HOME/.xds-site/$DET"
+if [ -f $site_file ]; then
+  echo Appending site parameters from: $site_file
+  echo "! Parameters from $site_file" >> XDS.INP
   echo "Site parameters:"
-  cat $file
+  cat $site_file | head -20
+  [ $(wc -l $site_file | awk '{print $1}') -gt 20 ] && echo "... (truncated)"
   echo
   # Only FRACTION_POLARIZATION and ROTATION_AXIS are commented out automatically because they
-  # are the most likely to not match defaults
+  # are the most likely to not match defaults.
+  # For segmented detectors, also allow origin and distance to be replaced
   # Also likely adjustments are UNTRUSTED regions and maybe SILICON, but those don't replace existing parameters
   # Create a pattern like "XX\|YY" to search overriden parameters.
-  pattern=$(grep "POLARIZATION\|ROTATION_AXIS\|TRUSTED_REGION" $file | \
-            awk 'match($0,/^ *(\w+) *=/,a){x=x"\\|"a[1];}END{print substr(x,3);}')
-  if [ "$pattern" != "" ]; then
-      sed 's/\(^ *\('$pattern'\) *=\)/!!\1/;' XDS.INP >tmp1
-      mv tmp1 XDS.INP
+  REDEF_TOKENS="POLARIZATION\|ROTATION_AXIS\|TRUSTED_REGION"
+  [ "$SEGMENTED" != "" ] && REDEF_TOKENS=$REDEF_TOKENS"\|ORGX\|ORGY\|DETECTOR_DISTANCE\|"
+  pattern=$(grep "$REDEF_TOKENS" $site_file | grep -v SEGMENT | uniq | awk 'match($0,/^ *(\w+) *=/,a){x=x"\\|"a[1];}END{print substr(x,3);}')
+  if [ "$pattern" != "" -a $(grep "^!! *\($pattern\)" XDS.INP) != ""]; then
+      sed 's/\(^ *\('$pattern'\) *=\)/!!!\1/;' XDS.INP >tmp1
       echo "Overridden parameters:"
-      grep "^!!*$pattern" XDS.INP
+      grep "^ *\($pattern\)" XDS.INP
       echo
+      mv tmp1 XDS.INP
   fi
-  cat $file >> XDS.INP
+  cat $site_file >> XDS.INP
 else
-  echo "Detector specific parameters can be placed in: $file"
+  if [ "$SEGMENTED" != "" ]; then
+    echo "**** Multi-SEGMENTed detector, site file is mandatory ****"
+  fi
+  echo "Detector specific parameters can be placed in: $site_file"
   echo "! Detector specific parameters can be placed in:" >> XDS.INP
-  echo "!     $file" >> XDS.INP
+  echo "!     $site_file" >> XDS.INP
   echo "! FRACTION_OF_POLARIZATION, ROTATION_AXIS and TRUSTED_REGION will auto-comment the replaced parameters" >> XDS.INP
+  echo "! If the site file defines SEGMENTs then ORGX, ORGY, and DISTANCE may be overridden" >> XDS.INP
 fi
 echo XDS.INP is ready for use. The file has only the most important keywords.
 echo Full documentation, including complete detector templates, at xds.mr.mpg.de .
@@ -1250,4 +1273,4 @@ echo More documentation in wiki.uni-konstanz.de/xds/index.php .
 echo After running xds, inspect at least the agreement of predicted and observed
 echo spots in FRAME.cbf!
 rm -f tmp1 tmp2
-
+# end of generate_XDS.INP
