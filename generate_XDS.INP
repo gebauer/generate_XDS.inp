@@ -129,7 +129,8 @@
 # revision 1.16 . KD 26/05/2023 fix bug on Mac for Pilatus CBF missing two lines
 # revision 1.17 . JMK 31/05/2023 fix sed error for Mac, where \| is not supported
 # revision 1.18 . JMK 19/08/2023 Pilatus 12M support, give help msg if $5 defined (i.e. unquoted frame pattern)
-REVISION="1.18 (19-Aug-2023)"
+# revision 1.19 . KD 14/10/2023 Pilatus 12M at DLS I23 has reverse phi. Fix download commands.
+REVISION="1.19 (14-Oct-2023)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -545,12 +546,14 @@ elif [ "$DET" == "pilatus" ]; then
       # Known detectors for reversed-phi at CHESS F1 PILATUS3 6M, S/N 60-0127
       # Known detectors for reversed-phi at SSRF BL18U1 (S/N 60-0123) and BL19U1 (S/N XX-XXX) (!; 2019-10-19: staff will fix this)
       DET_SN=`grep "Detector:" tmp2 | sed "s/^.*Detector: *//"`
+      echo detector serial number is $DET_SN
       REVERSEPHI_SNs="
 PILATUS3 6M, S/N 60-0125
 PILATUS3 6M, S/N 60-0132
 PILATUS 2M, S/N 24-0109
 PILATUS3 6M, S/N 60-0127
 PILATUS3 6M, S/N 60-0123
+PILATUS 12M, S/N 120-0100
 "
       if echo "${DET_SN}${REVERSEPHI_SNs}" | sort | uniq -d | grep [0-9] > /dev/null; then
         REVERSE_PHI="yes"
@@ -961,10 +964,10 @@ if [ "$DET" == "eiger" ] && [ "$is_h5" == 1 ]; then
     durin_path=${DURIN_PATH-/usr/local/lib64/durin-plugin.so}
     if [ -e $durin_path ]; then
       LIB="LIB=$durin_path"
-      echo "LIB= <durin-plugin> was written to XDS.INP . Check the path! For Apple M1 processors, modify the name or set \$NEGGIA_PATH."
+      echo "LIB= <durin-plugin> was written to XDS.INP . Check the path! For Apple M1 processors, modify the name or set \$DURIN_PATH."
     else
       LIB="!LIB=/usr/local/lib64/durin-plugin.so"
-      echo "durin-plugin.so not found. Specify LIB=<path-to-durin-plugin> in XDS.INP -- set \$NEGGIA_PATH to specify the path!"
+      echo "durin-plugin.so not found. Specify LIB=<path-to-durin-plugin> in XDS.INP -- set \$DURIN_PATH to specify the path!"
     fi
   fi
 fi
