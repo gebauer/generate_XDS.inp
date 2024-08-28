@@ -130,7 +130,8 @@
 # revision 1.17 . JMK 31/05/2023 fix sed error for Mac, where \| is not supported
 # revision 1.18 . JMK 19/08/2023 Pilatus 12M support, give help msg if $5 defined (i.e. unquoted frame pattern)
 # revision 1.19 . KD 14/10/2023 Pilatus 12M at DLS I23 has reverse phi. Fix download commands.
-REVISION="1.19 (14-Oct-2023)"
+# revision 1.20 . KD 13/7/2024 Comment out line STRONG_PIXEL=4 in preparation for mid-2024 version of XDS.
+REVISION="1.20 (13-Jul-2024)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -1000,7 +1001,7 @@ cat > XDS.INP << eof
 ! Full documentation, including complete detector templates, at xds.mr.mpg.de .
 ! More documentation in wiki.uni-konstanz.de/xds/index.php .
 ! After running xds, inspect at least the agreement of predicted and observed
-! spots in FRAME.cbf!
+! spots in FRAME.cbf (or SHOW_HKL.cbf in versions since BUILT=20240723)!
 !=============================================================================
 JOB= XYCORR INIT COLSPOT IDXREF DEFPIX INTEGRATE CORRECT
 ORGX= $ORGX ORGY= $ORGY  ! values from frame header; only read by XYCORR, IDXREF
@@ -1037,7 +1038,7 @@ FRIEDEL'S_LAW=FALSE     ! This acts only on the CORRECT step
 ! parameters with changes wrt default values:
 TRUSTED_REGION=$TRUSTED_REGION
 VALUE_RANGE_FOR_TRUSTED_DETECTOR_PIXELS=6000. 30000. ! often 7000 or 8000 is ok
-STRONG_PIXEL=4           ! COLSPOT: only use strong reflections (default is 3)
+!STRONG_PIXEL=4  ! COLSPOT: only use strong reflections (default is 3). For XDS versions before mid-2024.
 MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT=$MNOPIAS ! default of 6 is sometimes too high
 ! close spots/long cell axis: reduce SEPMIN and CLUSTER_RADIUS from their defaults of 7 and 3.5
 SEPMIN=$SEPMIN  CLUSTER_RADIUS=$CLUSTER_RADIUS ! 4 and 2 for Pixel Array Detectors
@@ -1274,6 +1275,6 @@ echo XDS.INP is ready for use. The file has only the most important keywords.
 echo Full documentation, including complete detector templates, at xds.mr.mpg.de .
 echo More documentation in wiki.uni-konstanz.de/xds/index.php .
 echo After running xds, inspect at least the agreement of predicted and observed
-echo spots in FRAME.cbf!
+echo "spots in FRAME.cbf (or SHOW_HKL.cbf in versions since BUILT=20240723)!"
 rm -f tmp1 tmp2
 # end of generate_XDS.INP
