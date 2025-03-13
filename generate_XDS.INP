@@ -131,7 +131,8 @@
 # revision 1.18 . JMK 19/08/2023 Pilatus 12M support, give help msg if $5 defined (i.e. unquoted frame pattern)
 # revision 1.19 . KD 14/10/2023 Pilatus 12M at DLS I23 has reverse phi. Fix download commands.
 # revision 1.20 . KD 13/7/2024 Comment out line STRONG_PIXEL=4 in preparation for mid-2024 version of XDS.
-REVISION="1.20 (13-Jul-2024)"
+# revision 1.21 . Thomas Hauß 12/03/2025 define for Bruker sfrm format DET= Bruker-sfrm and corresponding section
+REVISION="1.21 (13-Mar-2025)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -265,6 +266,11 @@ if [ "$is_h5" == 0 ]; then
  grep -q CMOS1 tmp2 && DET=adsc-CMOS1
  grep -q MARCONTROL tmp2 && DET=OLDMAR
  grep -q "WAVELENGTH=0.0" tmp2 && DET=experimental-ED
+ if head -c 240 tmp2 | grep -q "FORMAT" && \
+   head -c 240 tmp2 | grep -q "VERSION" && \
+   head -c 240 tmp2 | grep -q "HDRBLKS"; then
+    DET="Bruker-sfrm"
+ fi
 else
  h5dump -d "/entry/instrument/detector/description" $FIRSTFRAME | grep -i Eiger > /dev/null && DET=eiger
 fi
@@ -936,6 +942,102 @@ elif [ "$DET" == "Bruker-cbf" ]; then
   R3=`echo "scale=7; s($TWOTHETA/$DEGTOR)" | bc -l`
   DIRECTION_OF_DETECTOR_X_AXIS="$R1 0 $R3"
 # end of Bruker-cbf section
+
+elif [ "$DET" == "Bruker-sfrm" ]; then
+# echo "Detector from Bruker in sfrm format."
+  # MINIMUM_NUMBER_OF_PIXELS_IN_A_SPOT:
+  MNOPIAS=6
+  # use complete detector including corners:
+  TRUSTED_REGION="0 1.42"
+  SEPMIN=4            # 4 for Pixel Array Detectors
+  CLUSTER_RADIUS=2    # 2 for Pixel Array Detectors
+  # to read different format versions read these parametes first:
+  FORMAT=$(awk -F'FORMAT :' '{print $2}' tmp2 | awk '{print $1}')
+  VERSION=$(awk -F'VERSION:' '{print $2}' tmp2 | awk '{print $1}')
+  DETTYPE=$(awk -F'DETTYPE:' '{print $2}' tmp2 | awk '{print $1}')
+  DETTYPE="BRUKER_$DETTYPE"
+  echo "Bruker-sfrm file Format: $FORMAT, Version: $VERSION"
+  # use last value from CCDPARM and convert to integer
+  OVERLOAD=$(awk -F'CCDPARM:' '{print $2}' tmp2 | awk '{print int($5)}' | head -n1)
+  DETECTOR="${DETTYPE} MINIMUM_VALID_PIXEL_VALUE=0 OVERLOAD=${OVERLOAD}"
+  echo "DETECTOR $DETECTOR" 
+
+  NY=$(awk -F'NROWS  :' '{print $2}' tmp2 | awk '{print $1}')
+  NX=$(awk -F'NCOLS  :' '{print $2}' tmp2 | awk '{print $1}')
+  echo "NX" $NX
+  echo "NY" $NY
+
+  read ORGX ORGY < <(awk -F'CENTER :' '{print $2}' tmp2 | awk '{print $1, $2}')
+  # There seems to be an error in ORGY, the offset from the detector
+  # center is calculated wrong with a in inverted sign. Here an attempt
+  # to correct this, may be not valid in all cases. Found via comparison 
+  # with the Bruker CBF format. There the value of V should be positive!
+  ORGY=$(echo "scale=2; $NY - $ORGY" | bc -l)
+  echo "ORGX: $ORGX"
+  echo "ORGY: $ORGY"
+
+  # pixelsize from detector width NX and pixel per cm
+  pixelpercm=$(awk -F'DETTYPE:' '{print $2}' tmp2 | awk '{print $2}')
+  if [ NX == 512 ]; then
+    QX=$(echo "scale=6; 10.0 / $pixelpercm" | bc -l)
+    QY=QX=$(echo "scale=6; 10.0 / $pixelpercm" | bc -l)
+  else
+    QX=$(echo "scale=6; 5.0 / $pixelpercm" | bc -l)
+    QY=$(echo "scale=6; 5.0 / $pixelpercm" | bc -l)
+  fi
+  # QX=0.135  # from Bruker detector specification
+  # QY=0.135
+  echo "QX: $QX"
+  echo "QY: $QY"
+ 
+  # With Version < 11, only one distance written to header, then 2, second value seems ok.
+  if [ "$VERSION" -lt 11 ]; then
+    DETECTOR_DISTANCE=$(awk -F'DISTANC:' '{print $2}' tmp2 | awk '{print $1}')
+  else
+    DETECTOR_DISTANCE=$(awk -F'DISTANC:' '{print $2}' tmp2 | awk '{print $2}')
+  fi
+  DETECTOR_DISTANCE=$(echo "$DETECTOR_DISTANCE * 10" | bc -l)  # convert cm to mm
+  echo "DETECTOR_DISTANCE: $DETECTOR_DISTANCE"
+
+  X_RAY_WAVELENGTH=$(awk -F'WAVELEN:' '{print $2}' tmp2 | awk '{print $1}')
+  echo "X_RAY_WAVELENGTH: $X_RAY_WAVELENGTH"
+
+  read TWOTHETA OMEGA PHI KAPPA < <(awk -F'ANGLES :' '{print $2}' tmp2 | awk '{print $1, $2, $3, $4}')
+  echo "TWOTHETA OMEGA PHI KAPPA: $TWOTHETA $OMEGA $PHI $KAPPA"
+
+  # axis 1: 2-theta, 2: omega, 3: phi, 4: chi
+  axis=$(awk -F'AXIS   :' '{print $2}' tmp2 | awk '{print $1}')
+
+  if [ "$axis" == 3 ]; then
+    # PHI scan
+    echo "PHI scan"
+    DELTAPHI=$(awk -F'INCREME:' '{print $2}' tmp2 | awk '{print $1}')
+    R3=$(bc -l <<< "scale=7; s($KAPPA/$DEGTOR) * s($OMEGA/$DEGTOR)")
+    R1=$(bc -l <<< "scale=7; s($KAPPA/$DEGTOR) * c($OMEGA/$DEGTOR)")
+    R2=$(bc -l <<< "scale=7; c($KAPPA/$DEGTOR)")
+
+    ROTATION_AXIS="$R1 $R2 $R3"
+    OSCILLATION_RANGE=${DELTAPHI}
+    STARTING_ANGLE=${PHI}
+  else
+    echo "OMEGA scan"
+    ROTATION_AXIS="0 -1 0"
+    DELTAOMEGA=$(awk -F'INCREME:' '{print $2}' tmp2 | awk '{print $1}')
+    OSCILLATION_RANGE=${DELTAOMEGA}
+    STARTING_ANGLE=${OMEGA}
+  fi
+    
+  # detector X-axis
+  R1=$(bc -l <<< "scale=7; c($TWOTHETA/$DEGTOR)")
+  R3=$(bc -l <<< "scale=7; s($TWOTHETA/$DEGTOR)")
+  DIRECTION_OF_DETECTOR_X_AXIS="$R1 0 $R3"
+  echo "DIRECTION_OF_DETECTOR_X_AXIS: $DIRECTION_OF_DETECTOR_X_AXIS"
+
+  echo "STARTING_ANGLE $STARTING_ANGLE"
+  echo "OSCILLATION_RANGE $OSCILLATION_RANGE"
+  echo "ROTATION_AXIS $ROTATION_AXIS"
+  # end of Bruker-sfrm section
+
 else
   echo should never come here
   exit 1
@@ -1084,7 +1186,7 @@ cat >> XDS.INP << eof
 
 eof
 # --------- Append additional detector-specific parameters ----------
-if [ "$DET" == "Bruker-cbf" ]; then
+if [ "$DET" == "Bruker-cbf" -o "$DET" == "Bruker-sfrm" ]; then
   echo "DELPHI=15 ! refine less often than the default of 5" >> XDS.INP
 elif [ "$DET" == "adsc-CMOS1" ]; then
   echo UNTRUSTED_RECTANGLE= 0 1468  2451 2631  >> XDS.INP
