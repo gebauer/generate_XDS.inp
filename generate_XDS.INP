@@ -132,7 +132,8 @@
 # revision 1.19 . KD 14/10/2023 Pilatus 12M at DLS I23 has reverse phi. Fix download commands.
 # revision 1.20 . KD 13/7/2024 Comment out line STRONG_PIXEL=4 in preparation for mid-2024 version of XDS.
 # revision 1.21 . Thomas Hauß 12/03/2025 define for Bruker sfrm format DET= Bruker-sfrm and corresponding section
-REVISION="1.21 (13-Mar-2025)"
+# revision 1.22 . KD 28/5/2025 UNTRUSTED_RECTANGLEs for Pilatus3 1M, S/N 10-0159
+REVISION="1.22 (28-May-2025)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -1325,6 +1326,36 @@ eof
  UNTRUSTED_RECTANGLE=    0 4149   3262 3301
  UNTRUSTED_RECTANGLE=    0 4149   3812 3851
 eof
+# PILATUS 1M, S/N 10-0159
+  elif [ "$NX" == "981" -a "$NY" == "1043" ]; then
+    if ! grep -q Flat_field tmp2 ; then
+    echo Flat_field not found, smaller UNTRUSTED_RECTANGLEs than for bigger Pilatus
+    cat >> XDS.INP << eof
+! the following specifications are for a detector _without_ proper
+! flat_field correction; they mask one additional pixel adjacent
+! to each UNTRUSTED_RECTANGLE
+!EXCLUSION OF VERTICAL DEAD AREAS OF THE PILATUS3 1M, S/N 10-0159
+UNTRUSTED_RECTANGLE= 487  495     0 1044
+!EXCLUSION OF HORIZONTAL DEAD AREAS OF THE PILATUS3 1M, S/N 10-0159
+UNTRUSTED_RECTANGLE=   0 982   195  213
+UNTRUSTED_RECTANGLE=   0 982   407  425
+UNTRUSTED_RECTANGLE=   0 982   619  637
+UNTRUSTED_RECTANGLE=   0 982   831  849
+eof
+    else
+    echo Flat_field found, smaller UNTRUSTED_RECTANGLEs than for bigger Pilatus
+    cat >> XDS.INP << eof
+!EXCLUSION OF VERTICAL DEAD AREAS OF THE PILATUS3 1M, S/N 10-0159
+UNTRUSTED_RECTANGLE= 488  494     0 1044
+!EXCLUSION OF HORIZONTAL DEAD AREAS OF THE PILATUS3 1M, S/N 10-0159
+UNTRUSTED_RECTANGLE=   0 982   196  212
+UNTRUSTED_RECTANGLE=   0 982   408  424
+UNTRUSTED_RECTANGLE=   0 982   620  636
+UNTRUSTED_RECTANGLE=   0 982   832  848
+eof
+    fi
+
+# Pilatus 12M
   elif [ "$NX" == "2463" -a "$NY" == "5071" ]; then
     : # handled above, before writing XDS.INP, untrusted regions come from site file
   else
