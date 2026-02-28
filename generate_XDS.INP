@@ -133,7 +133,8 @@
 # revision 1.20 . KD 13/7/2024 Comment out line STRONG_PIXEL=4 in preparation for mid-2024 version of XDS.
 # revision 1.21 . Thomas Hauß 12/03/2025 define for Bruker sfrm format DET= Bruker-sfrm and corresponding section
 # revision 1.22 . KD 28/5/2025 UNTRUSTED_RECTANGLEs for Pilatus3 1M, S/N 10-0159
-REVISION="1.22 (28-May-2025)"
+# revision 1.23 . KD 28/2/2026 remove setting negative DETECTOR_DISTANCE for adsc-CMOS1 - found with SBGrid 383 (PDB 5HV4)
+REVISION="1.23 (28-Feb-2026)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -484,7 +485,8 @@ elif [ "$DET" == "adsc-CMOS1" ]; then
   ORGX=`grep BEAM_CENTER_X tmp2 | sed s/BEAM_CENTER_X=//`
   ORGY=`grep BEAM_CENTER_Y tmp2 | sed s/BEAM_CENTER_Y=//`
   REVERSE_PHI="yes"
-  DETECTOR_DISTANCE=`grep ^DISTANCE tmp2 | sed s/DISTANCE=/-/`
+# DETECTOR_DISTANCE=`grep ^DISTANCE tmp2 | sed s/DISTANCE=/-/` found to be wrong with SBGrid-383 28.2.26 ->rev 1.23
+  DETECTOR_DISTANCE=`grep ^DISTANCE tmp2 | sed s/DISTANCE=//`
   OSCILLATION_RANGE=`grep OMEGA_DELTA tmp2 | sed s/OMEGA_DELTA=//`
   DETECTOR_X_AXIS="-1 0 0"
 
