@@ -133,7 +133,8 @@
 # revision 1.20 . KD 13/7/2024 Comment out line STRONG_PIXEL=4 in preparation for mid-2024 version of XDS.
 # revision 1.21 . Thomas Hauß 12/03/2025 define for Bruker sfrm format DET= Bruker-sfrm and corresponding section
 # revision 1.22 . KD 28/5/2025 UNTRUSTED_RECTANGLEs for Pilatus3 1M, S/N 10-0159
-REVISION="1.22 (28-May-2025)"
+# revision 1.23 . JG 09/03/2026 Implementation for ID30B Pilauts CdTE detector. Introduction of calc_CdTe_Silicon () for 5-25kEV range.
+REVISION="1.23 (09-Mar-2026)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -160,10 +161,47 @@ if [ "$1" == "help" ] || [ "$1" == "-help" ] || [ "$1" == "-h" ] || [ "$1" == ""
 fi
 # make sure the locale does not interfere with e.g. awk calculations:
 export LC_ALL="C"
+
+
+
+# calc_CdTe_silicon() - Compute XDS SILICON parameter for CdTe (1mm sensor)
+# Valid range: 5-25 keV (0.496-2.480 A)
+# Fit: SILICON = 36548 * E_keV^(-2.661)  R2=0.9997 vs calcmu
+#
+# Usage:
+#   calc_CdTe_silicon 12.4        -> keV input
+#   calc_CdTe_silicon 1.0A        -> Angstrom input (A suffix, case-insensitive)
+#
+# Returns: SILICON value on stdout, or "XXX" if out of range
+# In script usage e.g. SILICON="SILICON= $(calc_CdTe_silicon ${X_RAY_WAVELENGTH}A)"
+calc_CdTe_silicon() {
+    local input="$1"
+    local kev
+
+    # Parse input: Angstrom or keV
+    if [[ "${input}" =~ ^([0-9]*\.?[0-9]+)[Aa]$ ]]; then
+        kev=$(awk -v l="${BASH_REMATCH[1]}" 'BEGIN { printf "%.6f", 12.39842/l }')
+    elif [[ "${input}" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+        kev="${input}"
+    else
+        echo "XXX"; return 1
+    fi
+
+    # Range check 5-25 keV, apply power law
+    awk -v kev="$kev" '
+    BEGIN {
+        if (kev < 5.0 || kev > 25.0) { print "XXX"; exit }
+        printf "%.4f\n", 36548.0 * (kev ^ -2.661)
+    }'
+}
+
+
 #
 # defaults:
 #
 # conversion radian / degrees:
+
+
 DEGTOR=57.2957795
 
 DETECTOR="XXX MINIMUM_VALID_PIXEL_VALUE=XXX OVERLOAD=XXX"
@@ -194,6 +232,7 @@ dtrek_det=""
 SEPMIN=7.0
 CLUSTER_RADIUS=3.5
 REFINE_CORRECT="CELL BEAM ORIENTATION AXIS POSITION ! Default is: refine everything"
+SILICON=""  # normally we don't need to set SILICON, but this is no correct for CdTe detector surfaces
 
 dname=$(dirname "$1")
 # Convert to full path (verify 'realpath' is available first)
@@ -274,6 +313,7 @@ if [ "$is_h5" == 0 ]; then
  fi
 else
  h5dump -d "/entry/instrument/detector/description" $FIRSTFRAME | grep -i Eiger > /dev/null && DET=eiger
+ h5dump -d "/entry/instrument/detector/description" $FIRSTFRAME | grep -i "PILATUS4 CdTe 4M" > /dev/null && DET=eiger
 fi
 
 # identify other detector types in the same way
@@ -693,7 +733,7 @@ elif [ "$DET" == "eiger" ]; then
     fi
 # revision 1.05 specialcase nframes for Eiger detectors at BNL
     if [ "$DET_SN" == "E-18-0104" -o "$DET_SN" == "E-32-0101" ]; then
-      nframes=`h5dump -A -g "/entry/data" $FIRSTFRAME | grep "DATASPACE  SIMPLE" | sed -e "s/,.*//" | awk '{a+=$5}END{print a}'`
+      nframes=`h5dump -A -g "/entry/data" $FIRSTFRAME | grep "DATASEPACE  SIMPLE" | sed -e "s/,.*//" | awk '{a+=$5}END{print a}'`
       DATA_RANGE="1 $nframes"
       SPOT_RANGE="1 `echo "scale=0; if (${nframes}<2) 1; if (${nframes}>1) ${nframes}/2"|bc -l`"
       echo Special case nframes for Eiger detectors at BNL: nframes=$nframes
@@ -719,6 +759,18 @@ elif [ "$DET" == "eiger" ]; then
   SENSOR_THICKNESS=`h5dump -d "/entry/instrument/detector/sensor_thickness" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
   X_RAY_WAVELENGTH=`h5dump -d "/entry/instrument/beam/incident_wavelength" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
 
+# revision 1.23: Settings for the Pilaus 4M CdTe ad ID30B / ESRF
+  if [ "$DET_SN" == "D033638" ]; then
+    echo "Pilatus 4M CdTe at ID30B / ESRF: setting SENSOR_THICKNESS and SILICON parameters for CdTe sensor"
+    SENSOR_THICKNESS=1.0
+    SILICON="SILICON= $(calc_CdTe_silicon ${X_RAY_WAVELENGTH}A)"
+    OVERLOAD=1048500
+    DETECTOR="PILATUS MINIMUM_VALID_PIXEL_VALUE=0 OVERLOAD= $OVERLOAD"
+# manually overwriting the DIRECTION_OF_DETECTOR_X/Y-AXIS and ROTATION_AXIS since the NeXus header of this detector is wrong (DIRECTION_OF_DETECTOR_X/Y-AXIS are swapped, and ROTATION_AXIS is inverted)
+    DIRECTION_OF_DETECTOR_X_AXIS="1.0 0.0 0.0"
+    DIRECTION_OF_DETECTOR_Y_AXIS="0.0 1.0 0.0"
+    ROTATION_AXIS="1.0 0.0 0.0"
+  fi
   NX=`h5dump -d "/entry/instrument/detector/detectorSpecific/x_pixels_in_detector" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
   NY=`h5dump -d "/entry/instrument/detector/detectorSpecific/y_pixels_in_detector" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
 
@@ -1154,6 +1206,7 @@ REFINE(CORRECT)= $REFINE_CORRECT
 ! parameters specifically for this detector and beamline:
 DETECTOR= $DETECTOR
 SENSOR_THICKNESS= $SENSOR_THICKNESS
+$SILICON 
 ! attention CCD detectors: for very high resolution (better than 1A) make sure to specify SILICON
 ! as about 32* what CORRECT.LP suggests (absorption of phosphor is much higher than that of silicon).
 ! Better: read the article http://wiki.uni-konstanz.de/xds/index.php/SILICON .
@@ -1356,6 +1409,29 @@ eof
     fi
 
 # Pilatus 12M
+2073 NY= 2180
+
+  elif [ "$NX" == "2073" -a "$NY" == "2180" ]; then
+# Pilatus 4M CdTe ; v1.23 numbers from Jan Gebauer
+    cat >> XDS.INP << eof
+!masking non sensitive area of Pilatus 4M CdTe
+ UNTRUSTED_RECTANGLE= 0 2074 255 276
+ UNTRUSTED_RECTANGLE= 0 2074 530 551
+ UNTRUSTED_RECTANGLE= 0 2074 805 826
+ UNTRUSTED_RECTANGLE= 0 2074 1080 1101
+ UNTRUSTED_RECTANGLE= 0 2074 1355 1376
+ UNTRUSTED_RECTANGLE= 0 2074 1630 1651
+ UNTRUSTED_RECTANGLE= 0 2074 1905 1926
+ UNTRUSTED_RECTANGLE= 513 521 0 2181
+ UNTRUSTED_RECTANGLE= 1033 1041 0 2181
+ UNTRUSTED_RECTANGLE= 1553 1561 0 2181
+ UNTRUSTED_RECTANGLE= 255 257 0 2181
+ UNTRUSTED_RECTANGLE= 775 777 0 2181
+ UNTRUSTED_RECTANGLE= 1295 1297 0 2181
+ UNTRUSTED_RECTANGLE= 1815 1817 0 2181
+eof
+
+
   elif [ "$NX" == "2463" -a "$NY" == "5071" ]; then
     : # handled above, before writing XDS.INP, untrusted regions come from site file
   else
