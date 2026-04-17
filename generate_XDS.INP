@@ -135,7 +135,8 @@
 # revision 1.22 . KD 28/5/2025 UNTRUSTED_RECTANGLEs for Pilatus3 1M, S/N 10-0159
 # revision 1.23 . KD 28/2/2026 remove setting negative DETECTOR_DISTANCE for adsc-CMOS1 - found with SBGrid 383 (PDB 5HV4)
 # revision 1.24 . Jan Gebauer 14/03/2026 Implementation for ID30B Pilatus CdTe detector. Introduction of calc_CdTe_Silicon () for 5-25kEV range.
-REVISION="1.24 (14-Mar-2026)"
+# Revision 1.25 . KD 17/4/2026 Pilatus4 Si 2M at SLS. HDF5: subtract 1 from /entry/instrument/detector//saturation_value to obtain OFFSET
+REVISION="1.25 (17-Apr-2026)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -311,7 +312,8 @@ if [ "$is_h5" == 0 ]; then
  fi
 else
  h5dump -d "/entry/instrument/detector/description" $FIRSTFRAME | grep -i Eiger > /dev/null && DET=eiger
- h5dump -d "/entry/instrument/detector/description" $FIRSTFRAME | grep -i "PILATUS4 CdTe 4M" > /dev/null && DET=eiger
+# h5dump -d "/entry/instrument/detector/description" $FIRSTFRAME | grep -i "PILATUS4 CdTe 4M" > /dev/null && DET=eiger
+ h5dump -d "/entry/instrument/detector/description" $FIRSTFRAME | grep -i PILATUS4 > /dev/null && DET=eiger
 fi
 
 # identify other detector types in the same way
@@ -650,10 +652,14 @@ elif [ "$DET" == "eiger" ]; then
 # find out if HDF5 from Diamond (DLS=1) or Dectris (DLS=0)
   DLS=0
   OVERLOAD=`h5dump -d "/entry/instrument/detector/detectorSpecific/countrate_correction_count_cutoff" $FIRSTFRAME 2>/dev/null` || DLS=1
+  #special case of PILATUS4 Si 2M at SLS does not have /entry/instrument/detector/detectorSpecific/countrate_correction_count_cutoff but should be treated as Dectris - seems to be SLS own '
+  if [ "$DET_SN" == "D029955" ]; then 
+    DLS=0
+  fi
   if [ "$DLS" == 1 ]; then
     echo Eiger HDF5 from Diamond
 # unfortunately h5dump 1.10 is required to get this right for the DLS .h5 files. This version is available at DLS but maybe not elsewhere
-    OVERLOAD=`h5dump -d "/entry/instrument/detector/saturation_value" $FIRSTFRAME | awk '/\(0\):/{print $2}'`
+    OVERLOAD=`h5dump -d "/entry/instrument/detector/saturation_value" $FIRSTFRAME | awk '/\(0\):/{print $2-1}'`
   # v0.95: fix the next 2 lines by taking care of negative values with the \- , and stop after first "(0)"
     OSCILLATION_RANGE=`h5dump -d "/entry/data/omega" $FIRSTFRAME | awk '/\(0\): [\-0-9]/{print $3-$2;exit}'`
     STARTING_ANGLE=`h5dump    -d "/entry/data/omega" $FIRSTFRAME | awk '/\(0\): [\-0-9]/{print $2;exit}' | sed -e "s/,//"`
@@ -664,6 +670,9 @@ elif [ "$DET" == "eiger" ]; then
   else
     echo Eiger HDF5 from Dectris
     OVERLOAD=`h5dump -d "/entry/instrument/detector/detectorSpecific/countrate_correction_count_cutoff" $FIRSTFRAME | awk '/\(0\):/{print $2}'`
+    if [ "$DET_SN" == "D029955" ]; then 
+      OVERLOAD=`h5dump -d "/entry/instrument/detector/saturation_value" $FIRSTFRAME | awk '/\(0\):/{print $2-1}'`
+    fi
     OSCILLATION_RANGE=`h5dump -d "/entry/sample/goniometer/omega_range_average" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
   # STARTING_ANGLE:  the \- was introduced in version 0.91 to allow negative values :
     STARTING_ANGLE=`h5dump -d "/entry/sample/goniometer/omega_start" $FIRSTFRAME 2>/dev/null | awk '/\(0\): [\-0-9]/{print $2}'`
@@ -1174,7 +1183,7 @@ SPOT_RANGE=$SPOT_RANGE
 SPACE_GROUP_NUMBER=0                   ! 0 if unknown
 UNIT_CELL_CONSTANTS= 70 80 90 90 90 90 ! put correct values if known
 INCLUDE_RESOLUTION_RANGE=50 0  ! after CORRECT, insert high resol limit; re-run CORRECT
-! IDXREF now obeys INCLUDE_RESOLUTION_RANGE and EXCLUDE_RESOLUTION_RANGE to exclude ice-rings
+! IDXREF obeys INCLUDE_RESOLUTION_RANGE and EXCLUDE_RESOLUTION_RANGE to exclude ice-rings
 
 FRIEDEL'S_LAW=FALSE     ! This acts only on the CORRECT step
 ! If the anom signal turns out to be, or is known to be, very low or absent,
@@ -1425,6 +1434,12 @@ eof
  UNTRUSTED_RECTANGLE= 775 777 0 2181
  UNTRUSTED_RECTANGLE= 1295 1297 0 2181
  UNTRUSTED_RECTANGLE= 1815 1817 0 2181
+eof
+  elif [ "$NX" == "1553" -a "$NY" == "1630" ]; then
+# Pilatus4 Si 2M ; v1.25 
+    cat >> XDS.INP << eof
+!masking non sensitive area of Pilatus4 Si 2M
+! UNTRUSTED_RECTANGLE= lines not needed because pixel counts are -1
 eof
 
 # Pilatus 12M
