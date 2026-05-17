@@ -136,7 +136,8 @@
 # revision 1.23 . KD 28/2/2026 remove setting negative DETECTOR_DISTANCE for adsc-CMOS1 - found with SBGrid 383 (PDB 5HV4)
 # revision 1.24 . Jan Gebauer 14/03/2026 Implementation for ID30B Pilatus CdTe detector. Introduction of calc_CdTe_Silicon () for 5-25kEV range.
 # Revision 1.25 . KD 17/4/2026 Pilatus4 Si 2M at SLS. HDF5: subtract 1 from /entry/instrument/detector//saturation_value to obtain OFFSET
-REVISION="1.25 (17-Apr-2026)"
+# Revision 1.26 . KD 17/5/2026 change default of FRIEDEL'S_LAW= to TRUE. Bruker section: negative OSCILLATION_RANGE, correct distance for sfrm. 
+REVISION="1.26 (17-May-2026)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -231,7 +232,7 @@ dtrek_det=""
 SEPMIN=7.0
 CLUSTER_RADIUS=3.5
 REFINE_CORRECT="CELL BEAM ORIENTATION AXIS POSITION ! Default is: refine everything"
-SILICON=""  # normally we don't need to set SILICON, but this is no correct for CdTe detector surfaces
+SILICON=""  # normally we don't need to set SILICON, but this is not correct for CdTe detector surfaces
 
 dname=$(dirname "$1")
 # Convert to full path (verify 'realpath' is available first)
@@ -985,17 +986,26 @@ elif [ "$DET" == "Bruker-cbf" ]; then
     R3=`echo "scale=7; s($KAPPA/$DEGTOR)*s($OMEGA/$DEGTOR)" | bc -l`
     R1=`echo "scale=7; s($KAPPA/$DEGTOR)*c($OMEGA/$DEGTOR)" | bc -l`
     R2=`echo "scale=7; c($KAPPA/$DEGTOR)         	  " | bc -l`
-    ROTATION_AXIS="$R1 $R2 $R3"
     OSCILLATION_RANGE=${DELTAPHI}
     STARTING_ANGLE=${PHI}
 # here we could check if DELTAPHI is <0, and if so, negate it and ROTATION_AXIS
  else
     echo OMEGA scan
-    ROTATION_AXIS="0 -1 0"
+    R1="0"
+    R2="-1"
+    R3="0"
     OSCILLATION_RANGE=${DELTAOMEGA}
     STARTING_ANGLE=${OMEGA}
-# here we could check if DELTAOMEGA is <0, and if so, negate it and ROTATION_AXIS
  fi
+ # if negative OSCILLATION_RANGE, negate it, and negate ROTATION_AXIS components
+ if [ "$(echo "$OSCILLATION_RANGE < 0" | bc)" -eq 1 ]; then
+    echo "negated OSCILLATION_RANGE and ROTATION_AXIS"
+    OSCILLATION_RANGE=$(echo "-1 * $OSCILLATION_RANGE" | bc)
+    R1=$(echo "-1 * $R1" | bc)
+    R2=$(echo "-1 * $R2" | bc)
+    R3=$(echo "-1 * $R3" | bc)
+ fi
+ ROTATION_AXIS="$R1 $R2 $R3"
 
 # 2theta
   TWOTHETA=`awk '/TWOTHETA \? \? \?/{print $5;exit}' tmp2`
@@ -1052,14 +1062,58 @@ elif [ "$DET" == "Bruker-sfrm" ]; then
   echo "QX: $QX"
   echo "QY: $QY"
  
-  # With Version < 11, only one distance written to header, then 2, second value seems ok.
-  if [ "$VERSION" -lt 11 ]; then
+  # With Version < 11, only one distance written to header, then 2, second value seems ok. 
+  # KD 14.5.26 this doesn't work for insulin and glucose isomerase data from https://doi.org/10.1107/S2059798319010179
+  #if [ "$VERSION" -lt 11 ]; then
+  #  DETECTOR_DISTANCE=$(awk -F'DISTANC:' '{print $2}' tmp2 | awk '{print $1}')
+  #else
+  #  DETECTOR_DISTANCE=$(awk -F'DISTANC:' '{print $2}' tmp2 | awk '{print $2}')
+  #fi
+  # new way 14.5.26: if the preferred column ($2) is TRAILOR:0 (as for the insulin and glu-iso data), use $1
+  DETECTOR_DISTANCE=$(awk -F'DISTANC:' '{print $2}' tmp2 | awk '{print $2}')
+  if [ "$DETECTOR_DISTANCE" == "TRAILER:0" ]; then
+    echo "correcting DETECTOR_DISTANCE according to detector type"
     DETECTOR_DISTANCE=$(awk -F'DISTANC:' '{print $2}' tmp2 | awk '{print $1}')
-  else
-    DETECTOR_DISTANCE=$(awk -F'DISTANC:' '{print $2}' tmp2 | awk '{print $2}')
+    echo "DETECTOR_DISTANCE before correction:" "$(bc <<< "$DETECTOR_DISTANCE * 10.0")"
+    case "$DETTYPE" in
+     BRUKER_MULTIWIRE)
+         offset=2.0
+         ;;
+     BRUKER_CCD-PXL-ARR)
+         offset=0.4
+         ;;
+     BRUKER_CCD-PXL-L6500N|BRUKER_CCD-PXL-L6500F)
+         offset=1.5
+         ;;
+     BRUKER_CCD-PXL-2K|BRUKER_CCD-PXL-KAF1500|\
+     BRUKER_CCD-PXL-L6000|BRUKER_CCD-PXL-KAF2|\
+     BRUKER_CCD-PXL-KAF|BRUKER_CCD-PXL-MSPD|\
+     BRUKER_CCD-PXL|BRUKER_CCD-LDI)
+         offset=0.8
+         ;;
+     *)
+         offset=0
+         ;;
+    esac
+ 
+    DETECTOR_DISTANCE=$(bc <<< "$DETECTOR_DISTANCE + $offset")
+ 
+ #DETTYPE: PIXPERCM: CMTOGRID:   from BISFrameFileFormats.pdf
+ #MULTIWIRE 47.5 2.0
+ #CCD-PXL-2K 56.02 0.8
+ #CCD-PXL-ARR 32.00 0.4
+ #CCD-PXL-KAF1500 51.2 0.8
+ #CCD-PXL-L6500N 32.00 1.5
+ #CCD-PXL-L6500F 32.00 1.5
+ #CCD-PXL-L6000 56.02 0.3 (or 56.3,0.8?) the bracketed 0.8 is true for data from George Sheldrick's detector in 2004. KD 15.5.26
+ #CCD-PXL-KAF2 81.92 0.8
+ #CCD-PXL-KAF 81.92 0.8
+ #CCD-PXL-MSPD 81.92 0.8
+ #CCD-PXL 81.92 0.8
+ #CCD-LDI 83.333 0.8
   fi
-  DETECTOR_DISTANCE=$(echo "$DETECTOR_DISTANCE * 10" | bc -l)  # convert cm to mm
-  echo "DETECTOR_DISTANCE: $DETECTOR_DISTANCE"
+ 
+  DETECTOR_DISTANCE=$(bc <<< "$DETECTOR_DISTANCE * 10")  # convert cm to mm
 
   X_RAY_WAVELENGTH=$(awk -F'WAVELEN:' '{print $2}' tmp2 | awk '{print $1}')
   echo "X_RAY_WAVELENGTH: $X_RAY_WAVELENGTH"
@@ -1071,33 +1125,33 @@ elif [ "$DET" == "Bruker-sfrm" ]; then
   axis=$(awk -F'AXIS   :' '{print $2}' tmp2 | awk '{print $1}')
 
   if [ "$axis" == 3 ]; then
-    # PHI scan
     echo "PHI scan"
-    DELTAPHI=$(awk -F'INCREME:' '{print $2}' tmp2 | awk '{print $1}')
     R3=$(bc -l <<< "scale=7; s($KAPPA/$DEGTOR) * s($OMEGA/$DEGTOR)")
     R1=$(bc -l <<< "scale=7; s($KAPPA/$DEGTOR) * c($OMEGA/$DEGTOR)")
     R2=$(bc -l <<< "scale=7; c($KAPPA/$DEGTOR)")
-
-    ROTATION_AXIS="$R1 $R2 $R3"
-    OSCILLATION_RANGE=${DELTAPHI}
     STARTING_ANGLE=${PHI}
   else
     echo "OMEGA scan"
-    ROTATION_AXIS="0 -1 0"
-    DELTAOMEGA=$(awk -F'INCREME:' '{print $2}' tmp2 | awk '{print $1}')
-    OSCILLATION_RANGE=${DELTAOMEGA}
+    R1="0"
+    R2="-1"
+    R3="0"
     STARTING_ANGLE=${OMEGA}
   fi
-    
+  OSCILLATION_RANGE=$(awk -F'INCREME:' '{print $2}' tmp2 | awk '{print $1}')
+  # if negative OSCILLATION_RANGE, negate it, and negate ROTATION_AXIS components
+  if [ "$(echo "$OSCILLATION_RANGE < 0" | bc)" -eq 1 ]; then
+    echo "negated OSCILLATION_RANGE and ROTATION_AXIS"
+    OSCILLATION_RANGE=$(echo "-1 * $OSCILLATION_RANGE" | bc)
+    R1=$(echo "-1 * $R1" | bc)
+    R2=$(echo "-1 * $R2" | bc)
+    R3=$(echo "-1 * $R3" | bc)
+  fi  
+  ROTATION_AXIS="$R1 $R2 $R3"
   # detector X-axis
   R1=$(bc -l <<< "scale=7; c($TWOTHETA/$DEGTOR)")
   R3=$(bc -l <<< "scale=7; s($TWOTHETA/$DEGTOR)")
   DIRECTION_OF_DETECTOR_X_AXIS="$R1 0 $R3"
   echo "DIRECTION_OF_DETECTOR_X_AXIS: $DIRECTION_OF_DETECTOR_X_AXIS"
-
-  echo "STARTING_ANGLE $STARTING_ANGLE"
-  echo "OSCILLATION_RANGE $OSCILLATION_RANGE"
-  echo "ROTATION_AXIS $ROTATION_AXIS"
   # end of Bruker-sfrm section
 
 else
@@ -1170,7 +1224,7 @@ cat > XDS.INP << eof
 JOB= XYCORR INIT COLSPOT IDXREF DEFPIX INTEGRATE CORRECT
 ORGX= $ORGX ORGY= $ORGY  ! values from frame header; only read by XYCORR, IDXREF
 $COMMENT_ORGXY
-DETECTOR_DISTANCE= $DETECTOR_DISTANCE !read by XYCORR, IDXREF. Negative if detector normal points to crystal.
+DETECTOR_DISTANCE= $DETECTOR_DISTANCE  !read by XYCORR, IDXREF. Negative if detector normal points to crystal.
 OSCILLATION_RANGE= $OSCILLATION_RANGE
 STARTING_ANGLE= $STARTING_ANGLE
 X-RAY_WAVELENGTH= $X_RAY_WAVELENGTH
@@ -1185,15 +1239,12 @@ UNIT_CELL_CONSTANTS= 70 80 90 90 90 90 ! put correct values if known
 INCLUDE_RESOLUTION_RANGE=50 0  ! after CORRECT, insert high resol limit; re-run CORRECT
 ! IDXREF obeys INCLUDE_RESOLUTION_RANGE and EXCLUDE_RESOLUTION_RANGE to exclude ice-rings
 
-FRIEDEL'S_LAW=FALSE     ! This acts only on the CORRECT step
-! If the anom signal turns out to be, or is known to be, very low or absent,
-! use FRIEDEL'S_LAW=TRUE instead (or comment out the line); re-run CORRECT
-
-! remove the "!" in the following line:
+! If the anom signal turns out to be, or is known to be, strong, uncomment the next line:
+!FRIEDEL'S_LAW=FALSE   ! for CORRECT step. Default is TRUE (since 14.5.2026).
+! If the anomalous signal is very strong: in that case, in CORRECT.LP the three
+! "CHI^2-VALUE OF FIT OF CORRECTION FACTORS" values are significantly higher than 1, e.g. 1.5 
+! In that case, remove the "!" in the following line:
 ! STRICT_ABSORPTION_CORRECTION=TRUE
-! if the anomalous signal is strong: in that case, in CORRECT.LP the three
-! "CHI^2-VALUE OF FIT OF CORRECTION FACTORS" values are significantly> 1, e.g. 1.5
-!
 ! exclude (mask) untrusted areas of detector, e.g. beamstop shadow :
 ! UNTRUSTED_RECTANGLE= 1800 1950 2100 2150 ! x-min x-max y-min y-max ! repeat
 ! UNTRUSTED_ELLIPSE= 2034 2070 1850 2240 ! x-min x-max y-min y-max ! if needed
