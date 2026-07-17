@@ -136,8 +136,9 @@
 # revision 1.23 . KD 28/2/2026 remove setting negative DETECTOR_DISTANCE for adsc-CMOS1 - found with SBGrid 383 (PDB 5HV4)
 # revision 1.24 . Jan Gebauer 14/03/2026 Implementation for ID30B Pilatus CdTe detector. Introduction of calc_CdTe_Silicon () for 5-25kEV range.
 # Revision 1.25 . KD 17/4/2026 Pilatus4 Si 2M at SLS. HDF5: subtract 1 from /entry/instrument/detector//saturation_value to obtain OFFSET
-# Revision 1.26 . KD 17/5/2026 change default of FRIEDEL'S_LAW= to TRUE. Bruker section: negative OSCILLATION_RANGE, correct distance for sfrm. 
-REVISION="1.26 (17-May-2026)"
+# Revision 1.26 . KD 17/5/2026 change default of FRIEDEL'S_LAW= to TRUE. Bruker section: negative OSCILLATION_RANGE, correct distance for sfrm.
+# Revision 1.27 . KD 17/7/2026 comment out the last 4 UNTRUSTED_RECTANGLE definitions for the Pilatus 4M detector with NX=2073 NY=2180. They are too detector-specific.
+REVISION="1.27 (17-Jul-2026)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -1481,10 +1482,10 @@ eof
  UNTRUSTED_RECTANGLE= 513 521 0 2181
  UNTRUSTED_RECTANGLE= 1033 1041 0 2181
  UNTRUSTED_RECTANGLE= 1553 1561 0 2181
- UNTRUSTED_RECTANGLE= 255 257 0 2181
- UNTRUSTED_RECTANGLE= 775 777 0 2181
- UNTRUSTED_RECTANGLE= 1295 1297 0 2181
- UNTRUSTED_RECTANGLE= 1815 1817 0 2181
+ !UNTRUSTED_RECTANGLE= 255 257 0 2181
+ !UNTRUSTED_RECTANGLE= 775 777 0 2181
+ !UNTRUSTED_RECTANGLE= 1295 1297 0 2181
+ !UNTRUSTED_RECTANGLE= 1815 1817 0 2181
 eof
   elif [ "$NX" == "1553" -a "$NY" == "1630" ]; then
 # Pilatus4 Si 2M ; v1.25 
