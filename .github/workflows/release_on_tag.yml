@@ -1,0 +1,75 @@
+name: Announce new version
+
+# Fires when the daily sync pushes a new version tag.  Pushes made with a
+# deploy key do trigger workflows (unlike pushes made with GITHUB_TOKEN), so
+# nothing extra is needed on the server side.
+#
+# Existing tags are not affected - workflows only run for tags pushed from now
+# on, so the 110 backfilled versions will not produce 110 releases.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to publish, e.g. v1.27'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pick the tag
+        run: echo "TAG=${{ inputs.tag || github.ref_name }}" >> "$GITHUB_ENV"
+
+      - name: Refuse anything that is not a version tag
+        run: |
+          case "$TAG" in
+            v[0-9]*) echo "publishing $TAG" ;;
+            *) echo "refusing '$TAG' - not a version tag"; exit 1 ;;
+          esac
+
+      - name: Skip if the release already exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists"
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build release notes from the tag message
+        if: env.SKIP != '1'
+        run: |
+          tag="$TAG"
+          {
+            git tag -l --format='%(contents)' "$tag"
+            echo
+            echo '---'
+            echo
+            echo 'This repository is a read-only mirror. The script is maintained by'
+            echo 'Kay Diederichs on the XDSwiki; please report problems and send'
+            echo 'improvements there, not here:'
+            echo 'https://wiki.uni-konstanz.de/xds/index.php/Generate_XDS.INP'
+            echo
+            echo 'For use, prefer the official download:'
+            echo 'https://wiki.uni-konstanz.de/pub/linux_bin/generate_XDS.INP'
+          } > notes.md
+
+      - name: Create release
+        if: env.SKIP != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" --verify-tag \
+            --title "generate_XDS.INP ${TAG#v}" \
+            --notes-file notes.md
