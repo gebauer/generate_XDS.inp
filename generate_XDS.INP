@@ -138,7 +138,8 @@
 # Revision 1.25 . KD 17/4/2026 Pilatus4 Si 2M at SLS. HDF5: subtract 1 from /entry/instrument/detector//saturation_value to obtain OFFSET
 # Revision 1.26 . KD 17/5/2026 change default of FRIEDEL'S_LAW= to TRUE. Bruker section: negative OSCILLATION_RANGE, correct distance for sfrm.
 # Revision 1.27 . KD 17/7/2026 comment out the last 4 UNTRUSTED_RECTANGLE definitions for the Pilatus 4M detector with NX=2073 NY=2180. They are too detector-specific.
-REVISION="1.27 (17-Jul-2026)"
+# Revision 1.28 . KD 26/8/2026 make SPOT_RANGE equal to DATA_RANGE. Reason is that most BLs nowadays know more about raddam than 10 years ago. 
+REVISION="1.28 (26-Aug-2026)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -267,12 +268,14 @@ else
  DATA_RANGE="$data_first $data_last"
  echo DATA_RANGE=$DATA_RANGE
 
- # set SPOT_RANGE to first half of DATA_RANGE
- data_num=`wc -l tmp1 | awk '{print $1}'`
- data_half=`echo "scale=0; $data_num/2" | bc -l`
- data_half=`echo "if ($data_half<=1) 1;if ($data_half>1) $data_half" | bc -l`
- spot_last=`echo "scale=0; $data_first+$data_half-1" | bc -l`
- SPOT_RANGE="$data_first $spot_last"
+# # set SPOT_RANGE to first half of DATA_RANGE. reverted in rev 1.28
+# data_num=`wc -l tmp1 | awk '{print $1}'`
+# data_half=`echo "scale=0; $data_num/2" | bc -l`
+# data_half=`echo "if ($data_half<=1) 1;if ($data_half>1) $data_half" | bc -l`
+# spot_last=`echo "scale=0; $data_first+$data_half-1" | bc -l`
+# SPOT_RANGE="$data_first $spot_last"
+ SPOT_RANGE="$data_first $data_last"
+ echo SPOT_RANGE=$SPOT_RANGE
 fi
 
 FIRSTFRAME=`head -1 tmp1`
@@ -647,7 +650,8 @@ PILATUS 12M, S/N 120-0100
 elif [ "$DET" == "eiger" ]; then
  nframes=`h5dump -d "/entry/instrument/detector/detectorSpecific/nimages" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
  DATA_RANGE="1 $nframes"
- SPOT_RANGE="1 `echo "scale=0; if (${nframes}<2) 1; if (${nframes}>1) ${nframes}/2"|bc -l`"
+# SPOT_RANGE="1 `echo "scale=0; if (${nframes}<2) 1; if (${nframes}>1) ${nframes}/2"|bc -l`"    reverted in rev 1.28
+ SPOT_RANGE=$DATA_RANGE
  DET_SN=`h5dump -d "/entry/instrument/detector/detector_number" $FIRSTFRAME | awk '/\(0\): /{print $2}' | sed s/\"//g`
  echo detector serial number is $DET_SN
 
@@ -745,7 +749,8 @@ elif [ "$DET" == "eiger" ]; then
     if [ "$DET_SN" == "E-18-0104" -o "$DET_SN" == "E-32-0101" ]; then
       nframes=`h5dump -A -g "/entry/data" $FIRSTFRAME | grep "DATASPACE  SIMPLE" | sed -e "s/,.*//" | awk '{a+=$5}END{print a}'`
       DATA_RANGE="1 $nframes"
-      SPOT_RANGE="1 `echo "scale=0; if (${nframes}<2) 1; if (${nframes}>1) ${nframes}/2"|bc -l`"
+#      SPOT_RANGE="1 `echo "scale=0; if (${nframes}<2) 1; if (${nframes}>1) ${nframes}/2"|bc -l`"  reverted in rev 1.28
+      SPOT_RANGE=$DATA_RANGE
       echo Special case nframes for Eiger detectors at BNL: nframes=$nframes
     fi
   fi
