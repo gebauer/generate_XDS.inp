@@ -139,7 +139,8 @@
 # Revision 1.26 . KD 17/5/2026 change default of FRIEDEL'S_LAW= to TRUE. Bruker section: negative OSCILLATION_RANGE, correct distance for sfrm.
 # Revision 1.27 . KD 17/7/2026 comment out the last 4 UNTRUSTED_RECTANGLE definitions for the Pilatus 4M detector with NX=2073 NY=2180. They are too detector-specific.
 # Revision 1.28 . KD 26/8/2026 make SPOT_RANGE equal to DATA_RANGE. Reason is that most BLs nowadays know more about raddam than 10 years ago. 
-REVISION="1.28 (26-Aug-2026)"
+# Revision 1.29 . KD 26/9/2026 generalize "SILICON" value calculation for CdTe detectors (Eiger and Pilatus) 
+REVISION="1.29 (26-Sep-2026)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -573,9 +574,16 @@ elif [ "$DET" == "pilatus" ]; then
   grep -q Pixel_size tmp2 && QY=`awk '/Pixel_size/{print 1000*$5;exit}' tmp2`
 
       # find SENSOR_THICKNESS:
-      SENSOR_THICKNESS=`grep thickness tmp2 | sed -e s/'Si.* sensor, thickness'// | awk '{print $1*1000}'`
+#      SENSOR_THICKNESS=`grep thickness tmp2 | sed -e s/'Si.* sensor, thickness'// | awk '{print $1*1000}'`
+      # rev 1.29 make it work for both Si and CdTe
+# as of 20260926 this code is untested with real data! remove this comment once verified.
+      SENSOR_THICKNESS=`grep thickness tmp2 | sed -e s/'.* sensor, thickness'// | awk '{print $1*1000}'`
       # find X_RAY_WAVELENGTH:
       X_RAY_WAVELENGTH=`grep Wavelength tmp2 | sed -e s/Wavelength// -e s/A// | awk '{print $1}'`
+      
+      # rev 1.29: set SILICON if CdTe (it is in the line that also has "thickness")
+# as of 20260926, the rev 1.29 code is untested with real data! remove this comment once verified.
+      grep -i "cdte sensor" tmp2 && SILICON="SILICON= $(calc_CdTe_silicon ${X_RAY_WAVELENGTH}A)"
 
       # find NX and NY; 2463/2527 is 6M, 1475/1679 is 2M
       NX=`grep X-Binary-Size-Fastest-Dimension tmp2 | awk '{print $2}'`
@@ -774,14 +782,22 @@ elif [ "$DET" == "eiger" ]; then
   SENSOR_THICKNESS=`h5dump -d "/entry/instrument/detector/sensor_thickness" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2*1000}'`
   X_RAY_WAVELENGTH=`h5dump -d "/entry/instrument/beam/incident_wavelength" $FIRSTFRAME | awk '/\(0\): [0-9]/{print $2}'`
 
+# rev 1.29
+  SENSOR_MATERIAL=`h5dump -d "/entry/instrument/detector/sensor_material" $FIRSTFRAME | awk '/\(0\): /{print $2}'`
+  echo $SENSOR_MATERIAL
+  if [ "$SENSOR_MATERIAL" == '"CdTe"' ]; then
+    echo Detector with CdTe sensor
+    SILICON="SILICON= $(calc_CdTe_silicon ${X_RAY_WAVELENGTH}A)"
+  fi
+  
 # revision 1.24: Settings for the Pilatus 4M CdTe ad ID30B / ESRF
   if [ "$DET_SN" == "D033638" ]; then
-    echo "Pilatus 4M CdTe at ID30B / ESRF: setting SENSOR_THICKNESS and SILICON parameters for CdTe sensor"
-    SENSOR_THICKNESS=1.0
-    SILICON="SILICON= $(calc_CdTe_silicon ${X_RAY_WAVELENGTH}A)"
-    OVERLOAD=1048500
+# rev 1.29    echo "Pilatus 4M CdTe at ID30B / ESRF: setting SENSOR_THICKNESS and SILICON parameters for CdTe sensor"
+    echo "Pilatus 4M CdTe at ID30B / ESRF: swapping DIRECTION_OF_DETECTOR_X/Y-AXIS and inverting ROTATION_AXIS w.r.t. NeXus header"
+#    SENSOR_THICKNESS=1.0                                         # rev 1.29 should take care of this
+#    SILICON="SILICON= $(calc_CdTe_silicon ${X_RAY_WAVELENGTH}A)" # rev 1.29 should take care of this
+#    OVERLOAD=1048500 should be read from the header
     DETECTOR="PILATUS MINIMUM_VALID_PIXEL_VALUE=0 OVERLOAD= $OVERLOAD"
-# manually overwriting the DIRECTION_OF_DETECTOR_X/Y-AXIS and ROTATION_AXIS since the NeXus header of this detector is wrong (DIRECTION_OF_DETECTOR_X/Y-AXIS are swapped, and ROTATION_AXIS is inverted)
     DIRECTION_OF_DETECTOR_X_AXIS="1.0 0.0 0.0"
     DIRECTION_OF_DETECTOR_Y_AXIS="0.0 1.0 0.0"
     ROTATION_AXIS="1.0 0.0 0.0"
@@ -1530,7 +1546,7 @@ if [ -f $site_file ]; then
   REDEF_TOKENS="POLARIZATION\|ROTATION_AXIS\|TRUSTED_REGION"
   [ "$SEGMENTED" != "" ] && REDEF_TOKENS=$REDEF_TOKENS"\|ORGX\|ORGY\|DETECTOR_DISTANCE\|"
   pattern=$(grep "$REDEF_TOKENS" $site_file | grep -v SEGMENT | uniq | awk 'match($0,/^ *(\w+) *=/,a){x=x"\\|"a[1];}END{print substr(x,3);}')
-  if [ "$pattern" != "" -a $(grep "^!! *\($pattern\)" XDS.INP) != ""]; then
+  if [ "$pattern" != "" -a $(grep "^!! *\($pattern\)" XDS.INP) != "" ]; then
       sed 's/\(^ *\('$pattern'\) *=\)/!!!\1/;' XDS.INP >tmp1
       echo "Overridden parameters:"
       grep "^ *\($pattern\)" XDS.INP
