@@ -140,7 +140,8 @@
 # Revision 1.27 . KD 17/7/2026 comment out the last 4 UNTRUSTED_RECTANGLE definitions for the Pilatus 4M detector with NX=2073 NY=2180. They are too detector-specific.
 # Revision 1.28 . KD 26/8/2026 make SPOT_RANGE equal to DATA_RANGE. Reason is that most BLs nowadays know more about raddam than 10 years ago. 
 # Revision 1.29 . KD 26/9/2026 generalize "SILICON" value calculation for CdTe detectors (Eiger and Pilatus) 
-REVISION="1.29 (26-Sep-2026)"
+# Revision 1.30 . Thomas Hauß 16/11/2026 fix some differences in awk grep sed between Linux and macOS
+REVISION="1.30 (16-Nov-2026)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -1542,17 +1543,21 @@ if [ -f $site_file ]; then
   # are the most likely to not match defaults.
   # For segmented detectors, also allow origin and distance to be replaced
   # Also likely adjustments are UNTRUSTED regions and maybe SILICON, but those don't replace existing parameters
-  # Create a pattern like "XX\|YY" to search overriden parameters.
+  # Each of these parameters that the site file sets is commented out ("!!!") in XDS.INP, one keyword at a time.
   REDEF_TOKENS="POLARIZATION\|ROTATION_AXIS\|TRUSTED_REGION"
-  [ "$SEGMENTED" != "" ] && REDEF_TOKENS=$REDEF_TOKENS"\|ORGX\|ORGY\|DETECTOR_DISTANCE\|"
-  pattern=$(grep "$REDEF_TOKENS" $site_file | grep -v SEGMENT | uniq | awk 'match($0,/^ *(\w+) *=/,a){x=x"\\|"a[1];}END{print substr(x,3);}')
-  if [ "$pattern" != "" -a $(grep "^!! *\($pattern\)" XDS.INP) != "" ]; then
-      sed 's/\(^ *\('$pattern'\) *=\)/!!!\1/;' XDS.INP >tmp1
-      echo "Overridden parameters:"
-      grep "^ *\($pattern\)" XDS.INP
-      echo
+  [ "$SEGMENTED" != "" ] && REDEF_TOKENS=$REDEF_TOKENS"\|ORGX\|ORGY\|DETECTOR_DISTANCE"
+  keywords=$(grep "$REDEF_TOKENS" $site_file | grep -v SEGMENT | awk 'match($0,/^ *[A-Za-z0-9_]+ *=/){k=substr($0,RSTART,RLENGTH); gsub(/[ =]/,"",k); print k}' | sort -u)
+  overridden=""
+  for keyword in $keywords; do
+    if grep -q "^ *$keyword *=" XDS.INP; then
+      [ "$overridden" = "" ] && echo "Overridden parameters:"
+      grep "^ *$keyword *=" XDS.INP
+      sed "s/^\( *$keyword *=\)/!!!\1/" XDS.INP >tmp1
       mv tmp1 XDS.INP
-  fi
+      overridden=1
+    fi
+  done
+  [ "$overridden" != "" ] && echo
   cat $site_file >> XDS.INP
 else
   if [ "$SEGMENTED" != "" ]; then
