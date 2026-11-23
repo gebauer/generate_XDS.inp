@@ -141,7 +141,9 @@
 # Revision 1.28 . KD 26/8/2026 make SPOT_RANGE equal to DATA_RANGE. Reason is that most BLs nowadays know more about raddam than 10 years ago. 
 # Revision 1.29 . KD 26/9/2026 generalize "SILICON" value calculation for CdTe detectors (Eiger and Pilatus) 
 # Revision 1.30 . Thomas Hauß 16/11/2026 fix some differences in awk grep sed between Linux and macOS
-REVISION="1.30 (16-Nov-2026)"
+# Revision 1.31 . KD 23/11/2026 gzip-compressed CBF frames (.cbf.gz): LIB= line for EMBL-Hamburg's xds-zcbf plugin
+#                       (default /usr/local/lib64/xds-zcbf.so, or $ZCBF_PATH). A variable LIB in the environment no longer ends up in XDS.INP.
+REVISION="1.31 (23-Nov-2026)"
 
 #
 # usage: e.g. generate_XDS.INP "/file/system/frms/mydata_1_???.img"
@@ -282,6 +284,8 @@ fi
 
 FIRSTFRAME=`head -1 tmp1`
 echo $FIRSTFRAME | grep "\.h5$" && is_h5=1 || is_h5=0
+# gzip-compressed CBF? (FIRSTFRAME is replaced by its decompressed copy below)
+case "$FIRSTFRAME" in *.cbf.gz) is_cbf_gz=1;; *) is_cbf_gz=0;; esac
 
 # find out detector type
 DET=XXX
@@ -1192,6 +1196,7 @@ if (( $(echo "$X_RAY_WAVELENGTH > 1.54 && $X_RAY_WAVELENGTH < 1.55" |bc -l) )); 
   not_synchrotron='!'
 fi
 
+LIB=""   # written into XDS.INP below; must not come from the environment
 if [ "$DET" == "eiger" ] && [ "$is_h5" == 1 ]; then
   if [ "$DLS" == 0 ] ; then
     neggia_path=${NEGGIA_PATH-/usr/local/lib64/dectris-neggia.so}
@@ -1211,6 +1216,17 @@ if [ "$DET" == "eiger" ] && [ "$is_h5" == 1 ]; then
       LIB="!LIB=/usr/local/lib64/durin-plugin.so"
       echo "durin-plugin.so not found. Specify LIB=<path-to-durin-plugin> in XDS.INP -- set \$DURIN_PATH to specify the path!"
     fi
+  fi
+fi
+# gzip-compressed CBF: XDS reads these without a plugin too, but EMBL-Hamburg's xds-zcbf plugin is faster
+if [ "$is_cbf_gz" == 1 ]; then
+  zcbf_path=${ZCBF_PATH:-/usr/local/lib64/xds-zcbf.so}
+  if [ -e "$zcbf_path" ]; then
+    LIB="LIB=$zcbf_path"
+    echo "LIB= <xds-zcbf> was written to XDS.INP . Check the path! For Apple M1 processors, modify the name or set \$ZCBF_PATH."
+  else
+    LIB="!LIB=$zcbf_path"
+    echo "xds-zcbf.so not found - XDS reads the .cbf.gz frames without it, but more slowly. Specify LIB=<path-to-xds-zcbf> in XDS.INP -- set \$ZCBF_PATH to specify the path!"
   fi
 fi
 if [ "$ROTATION_AXIS" != "" ]; then
